@@ -65,4 +65,3 @@ No credentials are required. Do not claim completed real-keyboard, packaged life
 - Complete pricing/availability, properties, IARC ratings, English listing, real screenshots and certification notes.
 - Microsoft Application Developer Agreement 8.11 accepted on October 11, 2026 after the user's explicit authorization; acceptance verified in Partner Center.
 - Complete the remaining real-device and exact-package release checks before representing the app as release validated.
-

@@ -38,3 +38,13 @@ Final frozen-source development delivery observed in this session:
 - Structured inspection evidence: `artifacts/package-verification.json`; final MakeAppx/MakePri logs and resource dump are under `artifacts/logs`.
 
 The package is regenerated after the frozen final source state. `VERIFICATION.md` remains the required real-device release matrix; all unexecuted rows stay pending. `STORE_RELEASE.md` lists owner and certification prerequisites.
+
+## Store candidate prepared October 11, 2026
+
+The preceding development-identity observations are historical. The latest Store candidate uses the owner's actual Partner Center identity `14E33A41.KeyBridge`, version `0.1.3.0`, publisher `CN=BD412261-9548-4F5A-95C1-24B072A9C1CC`. Its SHA-256 is `29CB77FBAD8FE71FD6AB8AA088ABFF65026F422E37B819EE2F9DB9FFD2D73FD0`. Corresponding source was published in commit `2084d0a976522206312178008f0d769933623f13`.
+
+The final candidate build passed 32 Core tests and 58 platform checks, built with zero warnings/errors, and passed MakeAppx schema validation. The exact staged executable rendered all seven UI pages with smoke exit code 0, at native DPI. Four screenshots from this build were saved in the English Store listing. Changed physical Command roles now invalidate affected rule evidence; enabled unsupported replacement targets are rejected using the same predicate as runtime planning.
+
+The owner's public support email and privacy policy are included. Partner Center product reservation, properties, and IARC ratings were completed. Developer Agreement 8.11 and IARC terms were accepted only after explicit owner authorization. Submission progress is recorded in `STORE_SUBMISSION.md`.
+
+Real converted keyboard input, the signed installed package lifecycle, performance measurements, and Windows App Certification Kit checks remain pending. Automated and package-upload validation do not establish these results. Public publication must remain manually held until the release checks are completed.
