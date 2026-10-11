@@ -84,5 +84,5 @@ $hash = (Get-FileHash -LiteralPath $package -Algorithm SHA256).Hash
 Write-Host "Unsigned MSIX: $package"
 Write-Host "MakeAppx validation log: $makeAppxLog"
 Write-Host "MakePri indexing log: $priLog"
-Write-Host 'This package has not been signed, installed, certified, or approved for Microsoft Store submission.'
-Write-Host 'For local install, sign it with a trusted development certificate matching Publisher. See docs/STORE_RELEASE.md.'
+Write-Host 'Microsoft Store provides distribution signing for submitted MSIX packages.'
+Write-Host 'For a direct local install, use a trusted certificate matching Publisher. See docs/STORE_RELEASE.md.'
