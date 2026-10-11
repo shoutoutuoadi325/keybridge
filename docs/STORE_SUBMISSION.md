@@ -53,6 +53,10 @@ Capability rationale: runFullTrust supports the ordinary-user WPF desktop proces
 
 Source: https://github.com/shoutoutuoadi325/keybridge
 
+## Restricted capability field
+
+Ordinary-user WPF app; asInvoker, uiAccess=false, no elevation, driver or service. Uses documented WH_KEYBOARD_LL/SetWindowsHookEx and SendInput for configured Ctrl+letter shortcuts, RegisterHotKey for emergency pause, and opt-in StartupTask. Starts paused with user consent and shortcut setup. Other input sources and elevated windows retain native input. Pause/Exit release owned input state. No key history, input upload or telemetry. Source/privacy: https://github.com/shoutoutuoadi325/keybridge
+
 ## Submission record
 
 The owner authorized Developer Agreement 8.11 and the IARC terms on October 11, 2026. Pricing, properties and age ratings are saved. The original 0.1.3 submission was returned to draft to replace its package, screenshots and release copy with version 0.1.4. Publication uses the existing manual control.
