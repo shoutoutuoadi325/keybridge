@@ -19,4 +19,15 @@ The download targets Windows 11 x64 and ENG US in ordinary-permission applicatio
 - The extracted self-contained `KeyBridge.exe --smoke-test` exited with code zero and constructed/rendered all seven pages. This mode installs no keyboard hook, registers no hotkey, writes no profile and processes no global input.
 - `git diff --check` passed before committing.
 
-Local evidence is under `artifacts/review2`: `release-0.1.5-build.txt`, `release-0.1.5-package.txt` and `release-0.1.5-package-verification.json`. No additional interactive keyboard session was performed. This GitHub portable release does not constitute a new Microsoft Store submission.
+Local evidence is under `artifacts/review2`: `release-0.1.5-build.txt`, `release-0.1.5-package.txt` and `release-0.1.5-package-verification.json`. No additional interactive keyboard session was performed. The original GitHub portable publication did not include a Microsoft Store submission; the later Store update is recorded below.
+
+## Microsoft Store package
+
+The later October 11, 2026 Store update uses package version `0.1.5.0`, the same application source and the official Partner Center identity `14E33A41.KeyBridge`. PublisherDisplayName is `Zhiqi Zhang`, as reported by the current Product identity page.
+
+- Package: `14E33A41.KeyBridge_0.1.5.0_x64.msix`, 82,063,438 bytes.
+- SHA-256: `E6791091C317AB9F1C9529856A453245BB3A9619BB7D42B2F32D9C92E915A4BB`.
+- Release build and all 188 deterministic checks passed; MakePri and MakeAppx validation completed.
+- The final extracted MSIX executable rendered all seven pages with exit code zero.
+
+The final October 11 submission receipt reports In certification, with Submission Complete and Pre-processing In progress. Publishing is set to start as soon as certification passes; approval and publication have not yet been observed. The current submission status, reviewer instructions and receipts are maintained in `STORE_SUBMISSION.md`. `VERIFICATION.md` distinguishes current automated evidence from historical physical observations and unrun reference cases.

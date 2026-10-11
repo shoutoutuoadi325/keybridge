@@ -9,7 +9,22 @@ Recorded October 11, 2026.
 - Self-contained .NET Core and Windows Desktop runtime 10.0.12.
 - Microsoft Windows SDK BuildTools 10.0.28000.2705; MakeAppx and SignTool signatures verified as Microsoft Corporation.
 
-## Observed checks
+## Current 0.1.5.0 Store candidate
+
+Source commit: `c5902a2794d9396bdb4e20fc3b51732aa08ee531`.
+
+- `scripts/Package.ps1` built Release and ran all three deterministic harnesses: 54 Core tests, 75 Platform checks and 59 managed service checks passed (188 total), zero warnings/errors.
+- Self-contained win-x64 publication completed with runtime 10.0.12. MakePri generated the resource index and MakeAppx packed 0.1.5.0 with validation enabled.
+- Final package: `14E33A41.KeyBridge_0.1.5.0_x64.msix`, 82,063,438 bytes, SHA-256 `E6791091C317AB9F1C9529856A453245BB3A9619BB7D42B2F32D9C92E915A4BB`.
+- Product identity and Publisher remain unchanged. Partner Center's current Product identity requires PublisherDisplayName `Zhiqi Zhang`; a first upload retaining the old display name was rejected and replaced.
+- MakeAppx unpacked the final MSIX into a separate verification directory. Its manifest reports 0.1.5.0/x64 and the official identity/publisher/display name; the application file version is 0.1.5.0.
+- The final extracted executable rendered all seven pages with exit code zero. This mode installs no hook, registers no hotkey, writes no profile and processes no global input.
+- Home, Shortcuts, Try it and Settings renders were visually inspected and saved as the four English Store screenshots (2740 x 1761). The README shortcut image was refreshed from the same final payload. Reopening the Store listing confirmed four saved images and the new release notes.
+- Final payload verification is recorded in `artifacts/store-0.1.5-verification/final/result.json`; rendering is under its `artifacts/ui-smoke` subdirectory. Package tool logs are `artifacts/logs/MakeAppx-5608b308aead42aca68a3e3285dead37.log` and the adjacent MakePri log.
+
+No additional physical keyboard session, installed-package lifecycle test or Windows App Certification Kit run was performed. These checks are not certification approval. The current Partner Center result and supplied screenshots are recorded in `STORE_SUBMISSION.md`.
+
+## Historical 0.1.4.0 observed checks
 
 - Release build: zero warnings and errors.
 - Core harness: 32 tests passed.

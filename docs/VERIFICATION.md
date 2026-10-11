@@ -1,6 +1,8 @@
 # Release verification record
 
-Observed results: the owner completed the October 11, 2026 physical-keyboard local-editor actions and emergency pause successfully. The release build passed 32 core tests and 58 platform checks, MakeAppx validation and rendering of all seven pages. See `WINDOWS_TEST_SESSION.md` for the physical-keyboard session and `STORE_SUBMISSION.md` for the package identity. The tables below describe regression cases and expected behavior.
+Current candidate: KeyBridge 0.1.5.0, source commit `c5902a2`, recorded October 11, 2026. The Release build passed 54 Core tests, 75 Platform checks and 59 managed service checks (188 total), with zero warnings/errors. Store package validation and rendering evidence are recorded below and in `STORE_SUBMISSION.md`.
+
+The owner completed the earlier October 11 physical-keyboard local-editor actions and emergency pause on 0.1.3.0; see `WINDOWS_TEST_SESSION.md`. Those observations are historical and are not a new physical session for 0.1.5.0. The earlier 0.1.4.0 build had 32 Core tests and 58 Platform checks. The real Windows tables below remain reference procedures, not unobserved passes.
 
 ## Evidence to record
 
@@ -8,13 +10,18 @@ For each run: date/time, tester, commit, package SHA-256, Windows edition/build/
 
 ## Automated checks
 
-`scripts/Build.ps1` builds the solution and runs the deterministic core and platform console harnesses. Record its actual command, SDK version, count and output in the candidate evidence file. Automated tests verify rule/configuration/state logic and simulated platform transitions; they cannot establish external app, IME, real SendInput, hook timing, startup or uninstall behavior.
+`scripts/Build.ps1` builds the solution and runs the deterministic core, platform and managed service console harnesses. Record its actual command, SDK version, count and output in the candidate evidence file. Automated tests verify rule/configuration/state logic and simulated platform transitions; they cannot establish external app, IME, real SendInput, hook timing, startup or uninstall behavior.
 
 | Check | Record | Evidence |
 | --- | --- | --- |
-| Build and core harness | Passed | Release build; 32 core tests and 58 platform checks |
+| Build and deterministic harnesses | Passed | Release build; 54 Core tests, 75 Platform checks and 59 managed service checks; zero warnings/errors |
 | Self-contained x64 publish | Passed | .NET 10.0.12; win-x64 |
-| MakeAppx schema/payload validation | Passed | Microsoft Windows SDK 10.0.28000.0; version 0.1.4.0 |
+| MakeAppx schema/payload validation | Passed | Microsoft Windows SDK BuildTools 10.0.28000.2705; package version 0.1.5.0 |
+| Store package acceptance | Validated | Final 0.1.5.0 MSIX accepted with Zhiqi Zhang; runFullTrust approval remains part of certification |
+| UI rendering | Passed | Seven pages from the final extracted 0.1.5.0 MSIX; exit code zero; no hook, hotkey or profile writes |
+| English Store listing screenshots | Saved | Four 2740 x 1761 renders of Home, Shortcuts, Try it and Settings from the final package |
+| Store submission | In certification | October 11, 2026 final receipt: Submission Complete, Pre-processing In progress; automatic publication after certification; approval not yet observed |
+| Physical keyboard, packaged startup/update/uninstall and WACK | Not run for 0.1.5.0 | No additional interactive keyboard session or installed-package certification-kit run |
 
 ## Required real Windows cases
 

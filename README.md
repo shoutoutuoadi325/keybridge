@@ -90,12 +90,12 @@ cd keybridge
 ./scripts/Run.ps1
 ```
 
-Build and Run accept `-DotNetPath` when the SDK is installed outside PATH. Build runs the core and platform harnesses.
+Build and Run accept `-DotNetPath` when the SDK is installed outside PATH. Build runs the core, platform and managed service harnesses.
 
 Create the self-contained download package with:
 
 ```powershell
-./scripts/Package-Portable.ps1 -Version 0.1.4
+./scripts/Package-Portable.ps1 -Version 0.1.5
 ```
 
 The script writes the Windows x64 ZIP and its checksum under `artifacts/packages`. For Microsoft Store packaging, see [packaging instructions](docs/STORE_RELEASE.md). [API references](docs/API_REVIEW.md) and the [configuration schema](docs/PROFILE_SCHEMA.md) describe the implementation.

@@ -32,7 +32,7 @@ From the repository root:
   -IdentityName $partnerCenterIdentityName `
   -Publisher $partnerCenterPublisher `
   -PublisherDisplayName $partnerCenterPublisherDisplayName `
-  -Version 0.1.0.0
+  -Version 0.1.5.0
 ```
 
 Use the exact identity name, publisher distinguished name and publisher display name from Partner Center's Product identity page. The script requires these inputs and never creates a fake Store publisher. It accepts XML-sensitive characters safely and requires a zero final version component for Store packages. Keep identity values stable between upgrades. Increase the package version on every submission.
