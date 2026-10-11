@@ -37,7 +37,7 @@ public sealed class CompiledProfile
     public MatchResult Match(KeyChord physical, ForegroundContext context)
     {
         if (EmergencyPause.Matches(physical)) return MatchResult.Pass("Emergency pause is reserved for recovery.");
-        if (!Enabled) return MatchResult.Pass("Mapping is paused or setup is incomplete.");
+        if (!Enabled) return MatchResult.Pass("Mapping is paused.");
         if (!context.IsKnown || string.IsNullOrWhiteSpace(context.ProcessName)) return MatchResult.Pass("The foreground application is unknown.");
         if (context.Permission != PermissionState.Allowed) return MatchResult.Pass("The foreground permission boundary could not be confirmed.");
         if (excluded.Contains(context.ProcessName)) return MatchResult.Pass("The application is excluded.");
@@ -100,7 +100,7 @@ public static class RuleCompiler
             return new(null, issues.AsReadOnly());
         }
         if (!profile.ImePolicy.PreserveNativeSwitching || profile.ImePolicy.SwitchAction != SwitchAction.None)
-            Error("SwitchingUnavailable", "Custom IME switching is unavailable until its native event lifecycle is independently verified.");
+            Error("SwitchingUnavailable", "Use Windows input-method controls to switch languages.");
         if (profile.Rules.Count > MaximumRules || profile.ExcludedApps.Count > MaximumApplications)
             Error("CollectionLimit", "The configuration exceeds the rule or application limit.");
         if (profile.ImePolicy.AdditionalProtectedShortcuts is null || profile.ImePolicy.AdditionalProtectedShortcuts.Count > 32)
@@ -118,7 +118,7 @@ public static class RuleCompiler
             if (!ValidText(rule.Intent, 80, true)) Error("Intent", "An operation name must contain 1 to 80 printable characters.", rule.Id);
             if (!Enum.IsDefined(rule.ContextPolicy) || !Enum.IsDefined(rule.Origin)) Error("RulePolicy", "An unsupported rule policy or origin was supplied.", rule.Id);
             if (rule.Enabled && rule.Origin == RuleOrigin.UserGlobal)
-                Error("GlobalVerification", "Global mapping remains unavailable until evidence can identify each application separately. Use an application-specific rule.", rule.Id);
+                Error("GlobalVerification", "Choose an application for each enabled shortcut.", rule.Id);
             if (rule.Scope is null || !ValidProcessName(rule.Scope.ProcessName, rule.Origin == RuleOrigin.UserGlobal))
                 Error("RuleScope", "Application rules require an executable file name; global rules require an empty scope.", rule.Id);
             else if (rule.Origin == RuleOrigin.UserGlobal && rule.Scope.ProcessName.Length > 0)
@@ -126,7 +126,7 @@ public static class RuleCompiler
             if (!ValidChord(rule.Source, true) || !ValidChord(rule.Target, false))
             { Error("InvalidChord", "Rules require a supported main key, valid modifier flags, and no target Command alias.", rule.Id); continue; }
             if (rule.Enabled && !ShortcutSupport.IsSupportedTarget(rule.Target))
-                Error("UnsupportedTarget", "Enabled rules require Ctrl + letter targets with optional Shift. Unsupported future targets must remain disabled.", rule.Id);
+                Error("UnsupportedTarget", "Choose a Ctrl + letter target, optionally with Shift, for each enabled shortcut.", rule.Id);
             var source = rule.Source.ResolveCommand(profile.CommandKey);
             if (!ValidChord(source, false)) Error("RoleModifierConflict", "The Command role duplicates an explicit modifier family in this source.", rule.Id);
             if (source.Modifiers == KeyModifiers.None) Error("UnmodifiedSource", "Single-key remapping is not supported.", rule.Id);
@@ -146,10 +146,10 @@ public static class RuleCompiler
                 || !ValidText(evidence.Notes, MaximumTextLength) || evidence.VerifiedContexts is null
                 || evidence.VerifiedContexts.Count > 6 || evidence.VerifiedContexts.Any(c => !Enum.IsDefined(c))
                 || evidence.VerifiedContexts.Distinct().Count() != evidence.VerifiedContexts.Count)
-                Error("Verification", "Verification evidence is invalid or exceeds its bounds.", rule.Id);
+                Error("Verification", "Shortcut confirmation details are invalid or exceed their allowed length.", rule.Id);
             else if (rule.Enabled && (string.IsNullOrWhiteSpace(evidence.ApplicationVersion) || string.IsNullOrWhiteSpace(evidence.WindowsBuild)
                 || evidence.VerifiedContexts.Count == 0))
-                Error("UnverifiedRule", "Enabled rules require explicit application-version, Windows-build, and input-context trial evidence.", rule.Id);
+                Error("UnverifiedRule", "Confirm the application version, Windows build and input source before enabling this shortcut.", rule.Id);
             validated.Add(rule);
         }
         for (var i = 0; i < validated.Count; i++)

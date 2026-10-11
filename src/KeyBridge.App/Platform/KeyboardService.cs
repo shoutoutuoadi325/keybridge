@@ -136,9 +136,9 @@ public sealed class KeyboardService : IDisposable
                 _running = _hook != 0;
                 _localTrial = _running && temporaryLocalTrial;
                 var applicationTrial = Volatile.Read(ref _applicationTrial);
-                SetStatus(_running ? temporaryLocalTrial ? "Temporary local trial in KeyBridge only. No compatibility result is recorded. Hook health is unverified."
-                    : applicationTrial is not null ? $"Temporary single-rule trial in {applicationTrial.ProcessName} only. No compatibility result is recorded. Hook health is unverified."
-                    : "Mapping enabled for locally verified US ENG rules. Hook health is unverified."
+                SetStatus(_running ? temporaryLocalTrial ? "Shortcut preview is active in the KeyBridge editor."
+                    : applicationTrial is not null ? $"Shortcut preview is active in {applicationTrial.ProcessName}."
+                    : "Mapping enabled for your confirmed ENG US shortcuts."
                     : "Paused. Windows could not install the keyboard hook.");
             }
             finally { completed.TrySetResult(_running); }

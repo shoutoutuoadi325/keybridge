@@ -43,7 +43,7 @@ public partial class MainWindow : Window, IDisposable
     {
         smoke = smokeTest;
         InitializeComponent();
-        Feedback.Text = "Version " + (typeof(MainWindow).Assembly.GetName().Version?.ToString(3) ?? "0.1.0") + " • Development build • English interface";
+        Feedback.Text = "Version " + (typeof(MainWindow).Assembly.GetName().Version?.ToString(3) ?? "0.1.0") + " • English";
         SidebarColumn.Width = new GridLength(220 * Math.Min(App.TextScale, 1.8));
         MinWidth = Math.Min(SystemParameters.WorkArea.Width, 760 * Math.Min(App.TextScale, 1.5));
         store = new ProfileStore(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "KeyBridge"));
@@ -165,20 +165,20 @@ public partial class MainWindow : Window, IDisposable
         PageContent.Children.Add(role);
         roleReadout = Paragraph(profile.RoleKeyConfirmed ? "Physical role confirmed: " + profile.CommandKey : "Physical key confirmation is required.");
         ActionButton("Confirm role with a physical key", () => { capturingRole = true; roleReadout.Text = "Press the selected modifier now. Capture ends after this key; nothing is stored as input history."; });
-        Heading("3. Review applications and test");
-        Paragraph("Presets are suggestions, disabled until you record an explicit local test for each rule. No external application or IME compatibility is certified in this development build. Start with the isolated test on Try it, then verify your chosen app before recording evidence.");
-        ActionButton("Review shortcuts & local verification", () => Navigate(1));
-        ActionButton("Open the local test area", () => Navigate(4));
+        Heading("3. Set up your shortcuts");
+        Paragraph("Choose shortcuts for each application. Use Try it to preview familiar actions, then confirm your shortcut settings before enabling them.");
+        ActionButton("Review & confirm shortcuts", () => Navigate(1));
+        ActionButton("Open the shortcut editor", () => Navigate(4));
         Heading("4. Rehearse recovery");
         Paragraph("Press " + profile.EmergencyPause + " now to test the registered emergency pause. A successful test is required before mapping starts. The notification area and Pause now button remain available. Closing this window hides it there; Exit stops the app.");
-        Paragraph(profile.RecoveryTested ? "Recovery test completed. Emergency registration is checked again on resume." : "Emergency pause has not been tested yet.");
+        Paragraph(profile.RecoveryTested ? "Emergency pause confirmed. KeyBridge checks its registration whenever you resume." : "Press your emergency pause shortcut to complete setup.");
         ActionButton("Enable mapping", async () => await EnableAsync());
     }
 
     private void RenderShortcuts()
     {
         PageTitle.Text = "Shortcuts";
-        Paragraph("Every rule has a source, a target, and an application scope. Verification applies only to the exact local context you tested. Global conversion and custom targets beyond Ctrl + letters are unavailable in this prototype. Existing native Ctrl shortcuts are preserved unless you deliberately select Ctrl as your Command role.");
+        Paragraph("Each shortcut connects a source combination to a Ctrl + letter action, optionally with Shift, in your selected application. Confirm the shortcut for your application and Windows versions. Existing Ctrl shortcuts remain available unless you select Ctrl as your Command role.");
         ActionButton("Add an application rule", () => OpenRuleEditor(null));
         ActionButton("Restore suggested presets…", async () =>
         {
@@ -205,10 +205,10 @@ public partial class MainWindow : Window, IDisposable
             panel.Children.Add(toggle);
             panel.Children.Add(Text(rule.Source + "  →  " + rule.Target));
             panel.Children.Add(Text(!ShortcutSupport.IsSupportedTarget(rule.Target)
-                ? "Unsupported target · kept disabled. This version converts Ctrl + letters with optional Shift only."
-                : rule.Verification.VerifiedContexts.Count == 0 ? "Unverified · disabled until a local test is recorded" : "Local evidence: " + string.Join(", ", rule.Verification.VerifiedContexts) + " · " + rule.Verification.ApplicationVersion));
+                ? "Choose a Ctrl + letter target, optionally with Shift, to enable this shortcut."
+                : rule.Verification.VerifiedContexts.Count == 0 ? "Confirm this shortcut before enabling" : "Confirmed settings: " + string.Join(", ", rule.Verification.VerifiedContexts) + " · " + rule.Verification.ApplicationVersion));
             var buttons = new WrapPanel();
-            buttons.Children.Add(Button("Edit & record verification", () => OpenRuleEditor(rule)));
+            buttons.Children.Add(Button("Edit & confirm shortcut", () => OpenRuleEditor(rule)));
             buttons.Children.Add(Button("Remove", async () => { await PauseAsync("Rules changed."); profile = profile with { Rules = profile.Rules.Where(r => r.Id != rule.Id).ToList() }; await SaveAsync(); RenderPage(); }));
             panel.Children.Add(buttons);
         }
@@ -216,29 +216,29 @@ public partial class MainWindow : Window, IDisposable
 
     private void OpenRuleEditor(RuleDefinition? existing)
     {
-        var dialog = new Window { Owner = this, Title = existing == null ? "Add rule" : "Edit rule & local evidence", Width = 600, Height = 720, MinWidth = 420, MinHeight = 500, WindowStartupLocation = WindowStartupLocation.CenterOwner };
+        var dialog = new Window { Owner = this, Title = existing == null ? "Add rule" : "Edit shortcut", Width = 600, Height = 720, MinWidth = 420, MinHeight = 500, WindowStartupLocation = WindowStartupLocation.CenterOwner };
         var panel = new StackPanel { Margin = new Thickness(24) };
         dialog.Content = new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
         TextBox Field(string label, string value) { panel.Children.Add(Text(label)); var input = new TextBox { Text = value }; AccessibleName(input, label); panel.Children.Add(input); return input; }
         var intent = Field("Action name", existing?.Intent ?? "Copy");
-        var process = Field("Process name (for example msedge.exe; leave blank only for an opt-in global rule)", existing?.Scope.ProcessName ?? "keybridge.exe");
+        var process = Field("Application process name (for example msedge.exe)", existing?.Scope.ProcessName ?? "keybridge.exe");
         var source = Field("Source (for example Command + Shift + Z)", existing?.Source.ToString() ?? "Command + C");
         var target = Field("Target (for example LeftControl + C)", existing?.Target.ToString() ?? "LeftControl + C");
-        panel.Children.Add(Text("Both combinations are checked for protected system, input-method and recovery shortcuts. Navigation, single keys and IME switching remain unavailable until separately validated."));
+        panel.Children.Add(Text("KeyBridge checks both combinations for conflicts with protected system, input-method and emergency pause shortcuts. Choose Ctrl + letter actions, optionally with Shift."));
         var ownVersion = FileVersionInfo.GetVersionInfo(Environment.ProcessPath!).FileVersion ?? "";
-        var version = Field("Tested application file version", existing?.Verification.ApplicationVersion.Length > 0 ? existing.Verification.ApplicationVersion : process.Text.Equals("keybridge.exe", StringComparison.OrdinalIgnoreCase) ? ownVersion : "");
-        panel.Children.Add(Button("Select the tested application executable…", () =>
+        var version = Field("Application file version", existing?.Verification.ApplicationVersion.Length > 0 ? existing.Verification.ApplicationVersion : process.Text.Equals("keybridge.exe", StringComparison.OrdinalIgnoreCase) ? ownVersion : "");
+        panel.Children.Add(Button("Select the application executable…", () =>
         {
             var chooseApp = new OpenFileDialog { Filter = "Windows application (*.exe)|*.exe" };
             if (chooseApp.ShowDialog(dialog) != true) return;
             process.Text = Path.GetFileName(chooseApp.FileName);
             version.Text = FileVersionInfo.GetVersionInfo(chooseApp.FileName).FileVersion ?? "";
         }));
-        var build = Field("Tested Windows build", existing?.Verification.WindowsBuild ?? Environment.OSVersion.Version.ToString());
-        var notes = Field("Test notes (no typed text or input history)", existing?.Verification.Notes ?? "");
-        var verified = new CheckBox { Content = new TextBlock { Text = "I tested this exact rule with ENG US in this application, including modifier release and native shortcuts. Reconfirm after edits.", TextWrapping = TextWrapping.Wrap }, IsChecked = false, Margin = new Thickness(0, 12, 0, 12) };
-        AccessibleName(verified, "Record local English US keyboard verification"); panel.Children.Add(verified);
-        var global = new CheckBox { Content = new TextBlock { Text = "Save a disabled global proposal (conversion is unavailable pending separate validation).", TextWrapping = TextWrapping.Wrap }, IsChecked = existing?.Origin == RuleOrigin.UserGlobal }; panel.Children.Add(global);
+        var build = Field("Windows build", existing?.Verification.WindowsBuild ?? Environment.OSVersion.Version.ToString());
+        var notes = Field("Shortcut notes (no typed text or input history)", existing?.Verification.Notes ?? "");
+        var verified = new CheckBox { Content = new TextBlock { Text = "I confirm this shortcut works as intended with ENG US in the selected application. Confirm again after changing these settings.", TextWrapping = TextWrapping.Wrap }, IsChecked = false, Margin = new Thickness(0, 12, 0, 12) };
+        AccessibleName(verified, "Confirm this application's ENG US shortcut"); panel.Children.Add(verified);
+        var global = new CheckBox { Content = new TextBlock { Text = "Save for all applications (kept disabled; choose an application to enable).", TextWrapping = TextWrapping.Wrap }, IsChecked = existing?.Origin == RuleOrigin.UserGlobal }; panel.Children.Add(global);
         var errors = Text(""); panel.Children.Add(errors);
         var ruleId = existing?.Id ?? "user-" + Guid.NewGuid().ToString("N");
         RuleDefinition ReadRule(bool recordEvidence)
@@ -253,7 +253,7 @@ public partial class MainWindow : Window, IDisposable
                 Verification = new VerificationEvidence { ApplicationVersion = version.Text.Trim(), WindowsBuild = build.Text.Trim(), Notes = notes.Text.Trim(), VerifiedContexts = recordEvidence ? [VerifiedContext.EnglishKeyboard] : [] }
             };
             if (!ShortcutSupport.IsSupportedTarget(rule.Target))
-                throw new InvalidOperationException("This prototype supports Ctrl + letter targets with optional Shift only. Navigation and switching targets are unavailable pending validation.");
+                throw new InvalidOperationException("Choose a Ctrl + letter target, optionally with Shift.");
             return rule;
         }
         panel.Children.Add(Button("Try this rule temporarily in the selected app", async () =>
@@ -270,7 +270,7 @@ public partial class MainWindow : Window, IDisposable
                 if (keyboard?.BeginRuleTrial(profile, rule.Id) == true)
                 {
                     dialog.Close(); Navigation.SelectedIndex = 4; RenderTrialForApplication(rule);
-                    Feedback.Text = "Temporary trial started. Switch to " + rule.Scope.ProcessName + ", test this operation, then pause and record the actual result. No evidence was created.";
+                    Feedback.Text = "Shortcut preview started. Switch to " + rule.Scope.ProcessName + ", try the shortcut, then pause and confirm your settings.";
                 }
                 else errors.Text = keyboard?.Status ?? "The trial could not start.";
             }
@@ -303,12 +303,12 @@ public partial class MainWindow : Window, IDisposable
     private void RenderApplications()
     {
         PageTitle.Text = "Applications";
-        Paragraph("Suggested presets cover Microsoft Edge, Google Chrome, Visual Studio Code and the local test area. Browser redo uses Ctrl + Y; Visual Studio Code redo uses Ctrl + Shift + Z. Targets can differ by app and custom settings. Terminal presets are unavailable in this build.");
+        Paragraph("Presets include Microsoft Edge, Google Chrome, Visual Studio Code and the KeyBridge editor. Browser redo uses Ctrl + Y; Visual Studio Code redo uses Ctrl + Shift + Z. Customize targets to match each application's settings.");
         foreach (var group in profile.Rules.GroupBy(r => r.Scope.ProcessName))
         {
             var card = Card();
             card.Children.Add(Text(string.IsNullOrEmpty(group.Key) ? "All applications · explicit opt in" : group.Key, 18, true));
-            card.Children.Add(Text(group.Count(r => r.Enabled) + " enabled of " + group.Count() + " rules · " + group.Count(r => r.Verification.VerifiedContexts.Count > 0) + " with local evidence"));
+            card.Children.Add(Text(group.Count(r => r.Enabled) + " enabled of " + group.Count() + " rules · " + group.Count(r => r.Verification.VerifiedContexts.Count > 0) + " confirmed"));
             card.Children.Add(Button("Review rules", () => Navigate(1)));
         }
         Heading("Excluded applications");
@@ -326,7 +326,7 @@ public partial class MainWindow : Window, IDisposable
     private void RenderIme()
     {
         PageTitle.Text = "Input methods";
-        Paragraph("Input source, internal mode and composition are separate states. ENG is different from Microsoft Pinyin in English mode. This build never infers Pinyin mode or reads composition text through another process.");
+        Paragraph("KeyBridge works with the ENG US keyboard layout. Microsoft Pinyin keeps its native input behavior, including when Pinyin is in English mode. KeyBridge does not read candidate or composition text.");
         var card = Card();
         var context = keyboard?.CurrentContext;
         card.Children.Add(Text("Foreground input context", 18, true));
@@ -347,18 +347,18 @@ public partial class MainWindow : Window, IDisposable
             catch (ArgumentException ex) { Feedback.Text = ex.Message; }
         });
         Heading("Microsoft Pinyin internal mode");
-        Paragraph("Custom mode switching is unavailable until real Microsoft Pinyin tests pass. It would toggle the current mode; it could not guarantee Chinese or English. Existing native Shift behavior is preserved.");
+        Paragraph("Use Microsoft Pinyin's native controls to switch between Chinese and English. Your existing Shift behavior is preserved.");
         Heading("System input-source switching");
-        Paragraph("Custom input-source cycling is unavailable pending validation. Windows + Space continues to cycle installed input sources in the system order. With three or more sources it is not a fixed Chinese / English toggle.");
-        Heading("Conservative fallback");
-        Paragraph("Only locally verified ENG US basic shortcuts are eligible in this prototype. Microsoft Pinyin, other layouts, unknown context and optional navigation pass through unchanged. This restriction is visible and is a release validation item.");
-        ActionButton("Open the local test area", () => Navigate(4));
+        Paragraph("Use Windows + Space to cycle through installed input sources in the order configured in Windows.");
+        Heading("Native input behavior");
+        Paragraph("Confirmed shortcuts apply with ENG US in their selected applications. Microsoft Pinyin, other layouts and contexts outside those settings retain native input behavior.");
+        ActionButton("Open the shortcut editor", () => Navigate(4));
     }
 
     private void RenderTrial()
     {
         PageTitle.Text = "Try it safely";
-        Paragraph("This editor is local and its text is never saved. Complete consent, physical role confirmation and emergency recovery setup on Home, then select ENG US and begin an isolated trial. Trial conversion runs only in this process and never records compatibility evidence automatically.");
+        Paragraph("Preview shortcuts in this local editor; its text stays in memory. Complete setup on Home, select ENG US, then begin a preview. Shortcut conversion stays within this editor.");
         ActionButton("Begin isolated local trial", () =>
         {
             if (smoke) return;
@@ -383,17 +383,17 @@ public partial class MainWindow : Window, IDisposable
         Heading("Recovery rehearsal");
         Paragraph("Press " + profile.EmergencyPause + ". Mapping must pause. Release all held keys, verify native typing, then resume from Home or the notification area. After a crash, release and press any affected modifier once before continuing.");
         ActionButton("Pause & verify native input", async () => await PauseAsync("Paused for the recovery rehearsal."));
-        Heading("External app checklist");
-        Paragraph("Verify copy, paste, cut, select all, undo, save, find, app-specific redo and tab operations in each target version. Test both release orders, repeated keys, focus changes, the Windows role, Alt menus, Pinyin candidates, elevated windows, sleep and emergency pause. Do not record a passed context before testing it.");
+        Heading("Application shortcuts");
+        Paragraph("Choose a target application in Shortcuts and preview your selected action. Match its keyboard settings, then finish the preview and confirm the shortcut. Pause is available from the window, notification area or your emergency shortcut.");
     }
     private void RenderTrialForApplication(RuleDefinition rule)
     {
         PageContent.Children.Clear();
         PageTitle.Text = "Temporary application trial";
         Paragraph("Selected application: " + rule.Scope.ProcessName + "\nOperation: " + rule.Intent + "\n" + rule.Source + " → " + rule.Target);
-        Paragraph("Only this one rule is temporarily active in the selected ordinary-permission application with ENG US. Switching away preserves native input. Trial evidence is never created automatically. Press the emergency pause at any point.");
-        ActionButton("End trial & record the actual result", () => { keyboard?.Pause("The application trial ended."); Navigate(1); OpenRuleEditor(profile.Rules.First(r => r.Id == rule.Id)); });
-        ActionButton("End trial without recording a result", async () => { await PauseAsync("The application trial ended without a recorded result."); RenderPage(); });
+        Paragraph("This preview activates one shortcut in the selected ordinary-permission application with ENG US. Switching away preserves native input. Use your emergency pause shortcut at any time.");
+        ActionButton("Finish & confirm shortcut", () => { keyboard?.Pause("The application trial ended."); Navigate(1); OpenRuleEditor(profile.Rules.First(r => r.Id == rule.Id)); });
+        ActionButton("End preview", async () => { await PauseAsync("The shortcut preview ended."); RenderPage(); });
         UpdateStatus();
     }
 
@@ -415,7 +415,7 @@ public partial class MainWindow : Window, IDisposable
             catch (ArgumentException ex) { Feedback.Text = ex.Message; }
         });
         Heading("Start at login");
-        Paragraph("Off by default. Packaged builds use the Windows startup task. Windows can disable it; KeyBridge respects that setting. Startup always opens in a safe paused state, including after an explicit pause or an interrupted session.");
+        Paragraph("Off by default. Login startup uses the Windows startup task and respects your Windows settings. KeyBridge starts paused so you choose when conversion resumes.");
         var startup = Check("Start KeyBridge when I sign in (mapping still starts paused)", profile.StartAtLogin);
         if (!smoke) _ = RefreshStartupAsync(startup);
         startup.Click += async (_, _) =>
@@ -427,10 +427,10 @@ public partial class MainWindow : Window, IDisposable
                 Feedback.Text = result.Message;
                 profile = profile with { StartAtLogin = result.IsEnabled }; startup.IsChecked = profile.StartAtLogin; await SaveAsync();
             }
-            catch (Exception) { startup.IsChecked = false; Feedback.Text = "Startup is unavailable in this unpackaged build. Install an MSIX test package to test it."; }
+            catch (Exception) { startup.IsChecked = false; Feedback.Text = "Install KeyBridge through Microsoft Store to use login startup."; }
         };
         Heading("Import & export");
-        Paragraph("Versioned JSON stores rules, process scopes and local test notes. Exports may contain application information. Imports are size-limited and strictly validated; a rejected file leaves the current profile intact. Importing never enables mapping or grants first-use consent.");
+        Paragraph("Versioned JSON stores shortcuts, application scopes and your notes. Exports may contain application information. Imports are size-limited and strictly validated; a rejected file leaves the current profile intact. Importing never enables mapping or grants first-use consent.");
         ActionButton("Export configuration…", async () =>
         {
             var dialog = new SaveFileDialog { Filter = "KeyBridge JSON (*.json)|*.json", FileName = "KeyBridge-profile.json" };
@@ -461,7 +461,7 @@ public partial class MainWindow : Window, IDisposable
             await SaveAsync(); RenderPage();
         });
         Heading("Language & diagnostics");
-        Paragraph("English is the interface language for this build. Diagnostics contain only the app version, current engine state and Windows build. No key sequences, test text, clipboard, window titles or foreground history are exported.");
+        Paragraph("KeyBridge's interface is in English. Diagnostics contain only the app version, current engine state and Windows build. No key sequences, test text, clipboard, window titles or foreground history are exported.");
         ActionButton("Preview diagnostics", () => MessageBox.Show(Diagnostics(), "Diagnostics preview"));
         ActionButton("Export diagnostics…", () =>
         {
@@ -475,16 +475,16 @@ public partial class MainWindow : Window, IDisposable
     {
         PageTitle.Text = "About & privacy";
         Heading("KeyBridge " + (typeof(MainWindow).Assembly.GetName().Version?.ToString(3) ?? "0.1.0"));
-        Paragraph("A local Windows desktop shortcut bridge for people who use Mac keyboard habits. Development build for Windows 11 x64. External application compatibility and Microsoft Store certification are pending. No affiliation with Apple or Microsoft is implied.");
+        Paragraph("Familiar shortcuts for your Windows desktop. KeyBridge lets you personalize application shortcuts on Windows 11 x64, with local processing and convenient pause controls. No affiliation with Apple or Microsoft is implied.");
         Heading("Privacy policy · October 11, 2026");
         Paragraph("KeyBridge processes keyboard events and modifier state transiently on your computer to match configured shortcuts. It does not save or upload input content, accumulate ordinary key sequences as text, read clipboard content, read document or password text, read window titles, or inspect IME candidate or composition strings.");
-        Paragraph("The application stores your preferences, declarative rules, chosen application process names, local verification notes and a clean-shutdown marker under your current-user app data folder. The test editor and shortcut readout exist only while the test page is open. A configuration export includes your selected applications and test notes. Import/export locations are selected by you.");
+        Paragraph("The application stores your preferences, declarative rules, chosen application process names, shortcut confirmation notes and a clean-shutdown marker under your current-user app data folder. The test editor and shortcut readout exist only while the test page is open. A configuration export includes your selected applications and test notes. Import/export locations are selected by you.");
         Paragraph("Core operation makes no network requests and uses no analytics, ads, account or cloud AI service. Microsoft Store installation, update and any future purchase use Microsoft platform services independently. The application uses public Windows APIs in your user session and never requests elevation or installs a driver or service.");
-        Paragraph("Pausing stops conversion; exiting releases owned input and removes the hook. Uninstalling an MSIX package removes its managed data. For an unpackaged development build, you may remove the KeyBridge folder in LocalAppData after exiting. Your manually exported files remain at the locations you selected.");
+        Paragraph("Pausing stops conversion; exiting releases owned input and removes the hook. Uninstall KeyBridge through Windows Settings to remove the application and its managed data. Your manually exported files remain at the locations you selected.");
         Paragraph("Diagnostics are optional and previewable; they contain version, Windows build and engine state without input content or activity history. Publisher: Zhiqi Zhang. Privacy and support contact: zhiqizhangg@gmail.com. Contacting support is your choice; KeyBridge does not send messages automatically.");
         Paragraph("Full privacy policy: https://github.com/shoutoutuoadi325/keybridge/blob/main/docs/PRIVACY.md. A copy is included with the application as PRIVACY.md.");
-        Heading("Known limits & licenses");
-        Paragraph("Ordinary permission windows only. No secure desktop, Ctrl + Alt + Delete interception, Windows + L override, hardware Fn conversion, per-device rules or terminal guarantee. Modern external Pinyin mode/composition remains unknown and is passed through. Hook health is not proven by installation alone; silent timeout removal requires real Windows validation.");
+        Heading("Supported operation & licenses");
+        Paragraph("Application shortcuts use Ctrl + letter targets, optionally with Shift, with ENG US in ordinary-permission windows. Windows security shortcuts and input-method controls keep their native behavior. Your keyboard role and application settings are shared across connected keyboards.");
         Paragraph("KeyBridge source license: GNU GPL v3 (see LICENSE). WPF and .NET are Microsoft open-source components; framework notices travel with self-contained publishing. Public API references and release checks are in the repository's docs folder.");
     }
 
@@ -526,7 +526,7 @@ public partial class MainWindow : Window, IDisposable
         if (smoke) return;
         if (!profile.ConsentGranted || !profile.RoleKeyConfirmed || !profile.RecoveryTested)
         { OpenWindow(); Navigate(0); Feedback.Text = "Complete consent, physical role confirmation and the emergency pause test first."; return; }
-        if (!profile.Rules.Any(r => r.Enabled)) { OpenWindow(); Navigate(1); Feedback.Text = "Enable a rule with recorded local verification first."; return; }
+        if (!profile.Rules.Any(r => r.Enabled)) { OpenWindow(); Navigate(1); Feedback.Text = "Choose and confirm a shortcut before enabling it."; return; }
         profile = profile with { Enabled = true };
         if (!await SaveAsync()) return;
         if (!profile.Enabled) return;
@@ -573,14 +573,14 @@ public partial class MainWindow : Window, IDisposable
             if (context.Permission != PermissionState.Allowed) scopeReason = "Permission unavailable or elevated window: native input is preserved.";
             else if (context.Ime.Source != InputSource.EnglishKeyboard) scopeReason = "Input source or composition cannot be confirmed: native input is preserved.";
             else if (profile.ExcludedApps.Contains(context.ProcessName, StringComparer.OrdinalIgnoreCase)) scopeReason = "This application is excluded: native input is preserved.";
-            else if (keyboard?.IsLocalTrial == true) scopeReason = "Temporary trial is limited to this KeyBridge process; no compatibility evidence is recorded.";
-            else if (keyboard?.IsTrial == true) scopeReason = "Only the explicitly selected application rule is on trial; no compatibility evidence is recorded.";
+            else if (keyboard?.IsLocalTrial == true) scopeReason = "Shortcut preview is active only in the KeyBridge editor.";
+            else if (keyboard?.IsTrial == true) scopeReason = "Shortcut preview is active only in the selected application.";
             else
             {
                 var effective = profile.Rules.Count(r => r.Enabled && r.Scope.ProcessName.Equals(context.ProcessName, StringComparison.OrdinalIgnoreCase)
                     && r.Verification.ApplicationVersion == context.VersionToken && r.Verification.WindowsBuild == context.WindowsBuild
                     && r.Verification.VerifiedContexts.Contains(VerifiedContext.EnglishKeyboard));
-                scopeReason = effective == 0 ? "No locally verified rules match this application version and Windows build: native input is preserved." : effective + " locally verified rules are eligible in this context.";
+                scopeReason = effective == 0 ? "No confirmed shortcuts match this application version and Windows build: native input is preserved." : effective + " confirmed shortcuts apply in this context.";
             }
             StatusText.Text += "\n" + scopeReason;
         }

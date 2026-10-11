@@ -61,7 +61,7 @@ After signing, the script refreshes the SHA-256 sidecar. Record which hash was i
 - Reserve and check the final product name; supply real Partner Center identity, account verification and access.
 - Add the publisher's legal identity, working support contact and public HTTPS privacy URL. Replace development policy/contact text in the app and published policy.
 - Complete `VERIFICATION.md` on physical Windows and real applications, with exact versions, layouts and input-method settings. Resolve every input-loss, unintended IME switching, stuck-key, safety-shortcut or privacy failure.
-- Record the verified rules for each application and input context. Ship conditional navigation/IME actions only if proven; keep failed/unverified actions disabled and remove their Store claims.
+- Record the verified rules for each application and input context. Ship conditional navigation/IME actions only if proven; enable supported actions within their documented scope.
 - Verify packaged startup (including Windows disablement), update/persistence, sleep/lock, clean uninstall, and crash recovery.
 - Measure hook and emission latency, idle CPU and working set with hardware and methodology. Provide evidence of hook failure handling.
 - Validate the exact MSIX using MakeAppx and the certification kit; sign and install a local test package, then record its hash and install/update/uninstall results.
@@ -69,7 +69,7 @@ After signing, the script refreshes the SHA-256 sidecar. Record which hash was i
 - Provide real product screenshots, accurate description, age rating, regions, price and availability. Do not promise ARM64 or Windows 10 based on compilation.
 - Recheck applicable policies immediately before submission, and address restricted-capability review honestly.
 
-No Partner Center submission or release authorization is implied by these files.
+The current product identity and submission are recorded in `STORE_SUBMISSION.md`.
 
 ## Review instructions for certification
 

@@ -43,7 +43,7 @@ The product design document contains an illustrative configuration. Actual schem
 }
 ```
 
-The example is intentionally disabled and unverified. It does not assert that `editor.exe` exists or that this combination has been tested.
+The example starts disabled. Replace `editor.exe` with your application and confirm the shortcut settings before enabling.
 
 ## Required root fields
 
@@ -65,7 +65,7 @@ Each rule requires `id`, `intent`, `source`, and `target`. IDs must be unique. A
 
 Enabled rules require a nonempty application version, Windows build, and explicit input-context trial evidence. Runtime application versions and Windows builds must match exactly. The distinct evidence labels are `EnglishKeyboard`, `PinyinChineseIdle`, `PinyinEnglishIdle`, `PinyinUnknown`, `PinyinComposing`, and `OtherIme`. Evidence for ENG does not imply evidence for Microsoft Pinyin English mode. Evidence describes local user trials; suggested presets carry none.
 
-The current native adapter only permits the standard US ENG layout and the validated target shapes documented in the release limitations. The larger core state model reserves future independently tested contexts. Recording a label cannot bypass adapter restrictions. Global mapping and both custom IME-switching actions are unavailable in this prototype. `switchAction` must remain `None`, and `preserveNativeSwitching` must remain true.
+The current native adapter only permits the standard US ENG layout and the validated target shapes documented in the release limitations. The larger core state model reserves future independently tested contexts. Recording a label cannot bypass adapter restrictions. Enabled shortcuts use application scopes; Windows retains control of input-method switching. `switchAction` must remain `None`, and `preserveNativeSwitching` must remain true.
 
 ## Bounds and persistence
 

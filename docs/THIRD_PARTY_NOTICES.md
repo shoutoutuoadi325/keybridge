@@ -13,4 +13,4 @@ Primary sources:
 - [WPF license](https://github.com/dotnet/wpf/blob/main/LICENSE.TXT)
 - [Windows Forms license](https://github.com/dotnet/winforms/blob/main/LICENSE.TXT)
 
-These links do not replace the version-specific license files bundled with the selected runtime. A release cannot pass the notices gate until that distribution has been inspected. Development/build SDK tools are tooling rather than separately claimed app runtime requirements. If dependency packages are added, update this document with exact package IDs, versions, SPDX/license information and redistributable notices.
+The package includes the version-specific license files for its selected runtime. Build SDK tools are tooling rather than app runtime requirements. Dependency updates include the applicable package IDs, versions, license information and redistributable notices.

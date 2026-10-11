@@ -14,7 +14,7 @@ The Try it page displays the key you are testing only while its test control has
 
 ## Local information saved
 
-KeyBridge saves your chosen keyboard role, application rules, exclusions, language preference, consent/onboarding completion, pause preference, recovery state and other application settings in your current user's application data area. Application rule entries may contain process names that you chose. Packaged installations use Windows per-user application-data behavior; an unpackaged development build uses the user's local application data directory. Settings are not encrypted by KeyBridge; protect your Windows account and exported files accordingly.
+KeyBridge saves your chosen keyboard role, application rules, exclusions, language preference, consent/onboarding completion, pause preference, recovery state and other application settings in your current user's application data area. Application rule entries may contain process names that you chose. Microsoft Store installations use Windows per-user application-data behavior. Directly run copies store settings in the user's local application data directory. Settings are not encrypted by KeyBridge; protect your Windows account and exported files accordingly.
 
 Recovery markers indicate whether the last session ended normally. Configuration backups, when created by a migration or save operation, stay local. Diagnostics are limited to module status, application version and error information; input strings, key histories and window titles must not be included. The application has no automatic diagnostic upload.
 
@@ -24,7 +24,7 @@ Import and export use files that you select. Exported configurations can reveal 
 
 KeyBridge's shortcut functionality makes no network requests. The application includes no account service, advertisements, analytics SDK, cloud processing or automatic telemetry. It does not sell or disclose your local settings or input data to third parties.
 
-Microsoft Store installation, licensing and updates are platform services governed by Microsoft's policies and may use a network connection. If you independently send a support message or share an exported file, the service you use and the recipient receive the information you send. The application does not send that information automatically. Opening a public policy or support website, if provided in a release, uses your browser and that website's behavior.
+Microsoft Store installation, licensing and updates are platform services governed by Microsoft's policies and may use a network connection. If you independently send a support message or share an exported file, the service you use and the recipient receive the information you send. The application does not send that information automatically. Opening the public policy or support website uses your browser and that website's behavior.
 
 ## Your controls
 
@@ -32,7 +32,7 @@ You choose whether conversion runs. Use Pause in the main window or tray, the co
 
 Login startup is off initially and is enabled only by your choice. A startup task disabled in Windows is respected. Your explicit pause preference is retained, and unexpected termination causes a safe paused restart.
 
-You can inspect, edit, export or reset your configuration in Settings. Uninstall through Windows Settings > Apps > Installed apps. Windows manages removal of packaged application data. Files you exported elsewhere are retained until you delete them. Unpackaged development settings can be removed manually from the application's data directory after the process exits.
+You can inspect, edit, export or reset your configuration in Settings. Uninstall through Windows Settings > Apps > Installed apps. Windows manages removal of packaged application data. Files you exported elsewhere are retained until you delete them. Settings for directly run copies can be removed manually from the application's data directory after the process exits.
 
 ## Policy changes and contact
 
