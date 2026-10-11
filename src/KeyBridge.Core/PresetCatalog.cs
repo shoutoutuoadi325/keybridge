@@ -54,9 +54,9 @@ public static class KeyChordParser
         var modifiers = KeyModifiers.None;
         for (var index = 0; index < parts.Length - 1; index++)
         {
-            var token = parts[index] switch
+            var token = parts[index].ToUpperInvariant() switch
             {
-                "Ctrl" => "Control", "Win" => "Windows", "Cmd" => "Command", _ => parts[index]
+                "CTRL" => "Control", "WIN" => "Windows", "CMD" => "Command", _ => parts[index]
             };
             if (!Enum.TryParse<KeyModifiers>(token, true, out var modifier) || !Enum.IsDefined(modifier)
                 || modifier == KeyModifiers.None || (modifiers & modifier) != 0) return false;

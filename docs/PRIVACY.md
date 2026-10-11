@@ -28,7 +28,7 @@ Microsoft Store installation, licensing and updates are platform services govern
 
 ## Your controls
 
-You choose whether conversion runs. Use Pause in the main window or tray, the configured emergency shortcut (Ctrl+Alt+F12 by default), or Exit from the tray to stop conversion. Exit stops the engine and releases its own synthesized input state. A process crash can prevent cleanup; release and press any affected modifier once before resuming.
+You choose whether conversion runs. Use Pause in the main window or tray, the configured emergency shortcut (Ctrl+Alt+F10 by default), or Exit from the tray to stop conversion. KeyBridge releases its synthesized input and restores held modifiers. If Windows cannot finish recovery, mapping stays paused and the status identifies the keys to press and release. Exit removes the hook; unfinished recovery requires a new recovery rehearsal on the next launch. A process crash can prevent cleanup; press and release any affected modifier before resuming.
 
 Login startup is off initially and is enabled only by your choice. A startup task disabled in Windows is respected. Your explicit pause preference is retained, and unexpected termination causes a safe paused restart.
 

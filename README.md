@@ -14,7 +14,7 @@ Bring familiar Command-style shortcuts to your Windows desktop, with application
 
 ## Download
 
-**[Download KeyBridge 0.1.4 for Windows x64](https://github.com/shoutoutuoadi325/keybridge/releases/download/v0.1.4/KeyBridge-0.1.4-win-x64.zip)**
+**[Download KeyBridge 0.1.5 for Windows x64](https://github.com/shoutoutuoadi325/keybridge/releases/download/v0.1.5/KeyBridge-0.1.5-win-x64.zip)**
 
 Extract the entire ZIP to a folder of your choice, then open **KeyBridge.exe**. The download includes the .NET runtime, so no separate runtime installation is required. Keep the extracted files together.
 
@@ -35,7 +35,7 @@ Requires **Windows 11, an x64 processor and a physical keyboard**. The interface
 
 1. Open **KeyBridge.exe** and review the local processing information on **Home**.
 2. Choose a Command role, select **Confirm role with a physical key**, and press the selected key.
-3. Press your emergency pause shortcut to confirm it. The default is **Ctrl + Alt + F12**; you can choose another combination in **Settings** if Windows already uses it.
+3. Press your emergency pause shortcut to confirm it. The default is **Ctrl + Alt + F10**; you can choose another combination in **Settings** if Windows already uses it. F12 and protected input-method shortcuts are unavailable as recovery shortcuts.
 4. Select the **ENG US** keyboard layout and open **Try it** to preview editing shortcuts in the local editor.
 5. Open **Shortcuts**, choose the target application and configure your shortcuts. Preview the actions, confirm their settings, then save and enable them.
 6. Select **Enable mapping** on Home. Use **Pause now** or your emergency shortcut whenever you want native keyboard behavior.

@@ -14,5 +14,6 @@ try {
     if (-not $SkipTests) {
         Invoke-Checked $dotnet @('run', '--project', 'tests/KeyBridge.Core.Tests/KeyBridge.Core.Tests.csproj', '--configuration', $Configuration, '--no-build')
         Invoke-Checked $dotnet @('run', '--project', 'tests/KeyBridge.Platform.Tests/KeyBridge.Platform.Tests.csproj', '--configuration', $Configuration, '--no-build')
+        Invoke-Checked $dotnet @('run', '--project', 'tests/KeyBridge.Platform.Managed.Tests/KeyBridge.Platform.Managed.Tests.csproj', '--configuration', $Configuration, '--no-build')
     }
 } finally { Pop-Location }

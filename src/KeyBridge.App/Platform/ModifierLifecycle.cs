@@ -18,7 +18,14 @@ public sealed class ModifierLifecycle
     public void ObservePhysical(KeyCode key, bool down, bool forwarded)
     {
         _physical[(int)key] = down;
-        if (forwarded) { _native[(int)key] = down; _suspended[(int)key] = false; }
+        if (forwarded)
+        {
+            _native[(int)key] = down;
+            _suspended[(int)key] = false;
+            // A real press/release takes over native state after failed recovery.
+            // Once forwarded, this key must never be released as an app-owned key.
+            _owned[(int)key] = false;
+        }
     }
     public void ObserveExternalNative(KeyCode key, bool down)
     { _native[(int)key] = down; _owned[(int)key] = false; }

@@ -34,6 +34,9 @@ public partial class MainWindow : Window, IDisposable
     private bool storageBlocked;
     private AppProfile lastSavedProfile = AppProfile.CreateDefault();
     private readonly StartupController startupController = new();
+    private readonly ProfileOperationQueue profileOperations;
+    private long pauseGeneration;
+    private long trialGeneration;
     private TextBlock? roleReadout;
     private TextBlock? trialReadout;
     private TextBox? trialEditor;
@@ -47,22 +50,27 @@ public partial class MainWindow : Window, IDisposable
         SidebarColumn.Width = new GridLength(220 * Math.Min(App.TextScale, 1.8));
         MinWidth = Math.Min(SystemParameters.WorkArea.Width, 760 * Math.Min(App.TextScale, 1.5));
         store = new ProfileStore(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "KeyBridge"));
+        profileOperations = new ProfileOperationQueue(InitializeAsync);
         if (!smoke)
         {
             keyboard = new KeyboardService();
             keyboard.Changed += () => Dispatcher.BeginInvoke(new Action(UpdateStatus));
-            keyboard.EmergencyPauseTriggered += () => Dispatcher.BeginInvoke(new Action(async () =>
+            keyboard.EmergencyPauseTriggered += registration => Dispatcher.BeginInvoke(new Action(async () =>
             {
-                profile = profile with { Enabled = false, RecoveryTested = true };
-                await SaveAsync();
-                Feedback.Text = "Emergency pause tested successfully. Mapping is paused; resume only when you are ready.";
-                RenderPage();
+                RequestPause("Emergency pause. Resume must be chosen explicitly.");
+                await RunProfileOperationAsync(async () =>
+                {
+                    if (registration.Chord != profile.EmergencyPause || !keyboard.IsCurrentEmergencyRegistration(registration)) return;
+                    profile = profile with { Enabled = false, RecoveryTested = true };
+                    if (await SaveAsync()) Feedback.Text = "Emergency pause tested successfully. Mapping is paused; resume only when you are ready.";
+                    RenderPage();
+                });
             }));
             CreateTray();
             statusTimer.Tick += (_, _) => UpdateStatus();
             statusTimer.Start();
         }
-        Loaded += async (_, _) => await InitializeAsync();
+        Loaded += async (_, _) => await profileOperations.InitializeAsync();
         Closing += OnClosing;
         PreviewKeyDown += OnTrialKeyDown;
         if (!smoke)
@@ -82,15 +90,14 @@ public partial class MainWindow : Window, IDisposable
                 profile = loaded.Profile;
                 lastSavedProfile = profile;
                 storageBlocked = !loaded.Loaded && loaded.RecoveryRequired;
-                if (!profile.PreviousSessionClean) Feedback.Text = "The previous session did not close cleanly. Release and press any affected modifier, then test before resuming.";
-                else if (!string.IsNullOrEmpty(loaded.Message)) Feedback.Text = loaded.Message;
+                if (!string.IsNullOrEmpty(loaded.Message)) Feedback.Text = loaded.Message;
                 profile = profile with { Enabled = false, PreviousSessionClean = false };
                 var startupState = await startupController.GetStateAsync();
                 profile = profile with { StartAtLogin = startupState.IsEnabled };
                 if (!storageBlocked) { await store.SaveAsync(profile); lastSavedProfile = profile; }
                 keyboard!.Configure(profile);
             }
-            catch (Exception) { Feedback.Text = "Configuration could not be loaded. Mapping remains paused; fix file access before enabling."; }
+            catch (Exception) { storageBlocked = true; Feedback.Text = "Configuration could not be loaded. Mapping remains paused; import or reset in Settings to recover."; }
         }
         initialized = true;
         Navigation.SelectedIndex = 0;
@@ -115,7 +122,8 @@ public partial class MainWindow : Window, IDisposable
     private void NavigationChanged(object sender, SelectionChangedEventArgs e) { if (initialized) RenderPage(); }
     private void RenderPage()
     {
-        if (keyboard?.IsTrial == true && Navigation.SelectedIndex != 4) keyboard.Pause("The trial ended. Mapping is paused.");
+        trialGeneration++;
+        if (keyboard?.IsTrial == true && Navigation.SelectedIndex != 4) RequestPause("The trial ended. Mapping is paused.");
         capturingRole = false;
         trialDisplayActive = false;
         trialReadout = null;
@@ -142,7 +150,12 @@ public partial class MainWindow : Window, IDisposable
         Heading("1. Understand the change");
         Paragraph("KeyBridge processes keyboard events locally in real time. It does not save or upload input content, read your clipboard, install a driver, or request administrator access. A mapped shortcut replaces its original behavior in the selected application.");
         var consent = Check("I understand and agree to enable shortcut conversion when setup is complete.", profile.ConsentGranted);
-        consent.Click += async (_, _) => { keyboard?.Pause("Consent changed. Mapping is paused."); profile = profile with { ConsentGranted = consent.IsChecked == true, Enabled = false }; await SaveAsync(); };
+        consent.Click += async (_, _) =>
+        {
+            var granted = consent.IsChecked == true;
+            RequestPause("Consent changed. Mapping is paused.");
+            await RunProfileOperationAsync(async () => { profile = profile with { ConsentGranted = granted, Enabled = false }; await SaveAsync(); });
+        };
         ActionButton("Read the full privacy policy", () => Navigate(6));
         Heading("2. Choose your Command role");
         Paragraph("Left Alt is a starting point for a Windows keyboard and will replace matching Alt shortcuts. Apple Command often appears as Windows; Windows + L always stays protected. All physical keyboards share this profile. Right Alt is unavailable to protect AltGr.");
@@ -151,16 +164,19 @@ public partial class MainWindow : Window, IDisposable
         role.SelectionChanged += async (_, _) =>
         {
             if (role.SelectedItem is not KeyCode key) return;
-            await PauseAsync("Role key changed. Confirm the new key before resuming.");
-            var rules = profile.Rules;
-            if (key is KeyCode.LeftWindows or KeyCode.RightWindows)
+            RequestPause("Role key changed. Confirm the new key before resuming.");
+            await RunProfileOperationAsync(async () =>
             {
-                rules = rules.Where(r => !(r.Source.Modifiers.HasFlag(KeyModifiers.Command) && r.Source.Key == KeyCode.L)).ToList();
-                Feedback.Text = "Command + L rules were removed because Windows + L is system reserved. Use native Ctrl + L for the address bar.";
-            }
-            profile = ProfileChanges.WithCommandKey(profile with { Rules = rules }, key);
-            await SaveAsync();
-            if (roleReadout != null) roleReadout.Text = "Selected " + key + ". Press Confirm role, then press that physical key.";
+                var rules = profile.Rules;
+                if (key is KeyCode.LeftWindows or KeyCode.RightWindows)
+                {
+                    rules = rules.Where(r => !(r.Source.Modifiers.HasFlag(KeyModifiers.Command) && r.Source.Key == KeyCode.L)).ToList();
+                    Feedback.Text = "Command + L rules were removed because Windows + L is system reserved. Use native Ctrl + L for the address bar.";
+                }
+                profile = ProfileChanges.WithCommandKey(profile with { Rules = rules }, key);
+                await SaveAsync();
+                if (roleReadout != null) roleReadout.Text = "Selected " + key + ". Press Confirm role, then press that physical key.";
+            });
         };
         PageContent.Children.Add(role);
         roleReadout = Paragraph(profile.RoleKeyConfirmed ? "Physical role confirmed: " + profile.CommandKey : "Physical key confirmation is required.");
@@ -183,12 +199,15 @@ public partial class MainWindow : Window, IDisposable
         ActionButton("Restore suggested presets…", async () =>
         {
             if (MessageBox.Show("Export a backup from Settings first if needed. Replace preset-origin rules with disabled suggestions? Your custom rules stay in place.", "Restore presets", MessageBoxButton.YesNo) != MessageBoxResult.Yes) return;
-            await PauseAsync("Presets restored. Review and test before resuming.");
-            var overrides = profile.Rules.Where(r => r.Origin != RuleOrigin.ApplicationPreset).ToList();
-            var overrideIds = overrides.Select(r => r.Id).ToHashSet(StringComparer.Ordinal);
-            var suggested = PresetCatalog.CreateSuggestedRules().Where(r => !overrideIds.Contains(r.Id) && !(profile.CommandKey is KeyCode.LeftWindows or KeyCode.RightWindows && r.Source.Key == KeyCode.L));
-            profile = profile with { Rules = overrides.Concat(suggested).ToList() };
-            await SaveAsync(); RenderPage();
+            RequestPause("Presets restored. Review and test before resuming.");
+            await RunProfileOperationAsync(async () =>
+            {
+                var overrides = profile.Rules.Where(r => r.Origin != RuleOrigin.ApplicationPreset).ToList();
+                var overrideIds = overrides.Select(r => r.Id).ToHashSet(StringComparer.Ordinal);
+                var suggested = PresetCatalog.CreateSuggestedRules().Where(r => !overrideIds.Contains(r.Id) && !(profile.CommandKey is KeyCode.LeftWindows or KeyCode.RightWindows && r.Source.Key == KeyCode.L));
+                profile = profile with { Rules = overrides.Concat(suggested).ToList(), Enabled = false };
+                await SaveAsync(); RenderPage();
+            });
         });
         foreach (var rule in profile.Rules)
         {
@@ -198,8 +217,7 @@ public partial class MainWindow : Window, IDisposable
             AccessibleName(toggle, "Enable " + rule.Intent + " for " + rule.Scope.ProcessName);
             toggle.Click += async (_, _) =>
             {
-                var next = rule with { Enabled = toggle.IsChecked == true };
-                if (!await ReplaceRuleAsync(next)) toggle.IsChecked = rule.Enabled;
+                if (!await SetRuleEnabledAsync(rule.Id, toggle.IsChecked == true)) toggle.IsChecked = rule.Enabled;
                 RenderPage();
             };
             panel.Children.Add(toggle);
@@ -209,7 +227,11 @@ public partial class MainWindow : Window, IDisposable
                 : rule.Verification.VerifiedContexts.Count == 0 ? "Confirm this shortcut before enabling" : "Confirmed settings: " + string.Join(", ", rule.Verification.VerifiedContexts) + " · " + rule.Verification.ApplicationVersion));
             var buttons = new WrapPanel();
             buttons.Children.Add(Button("Edit & confirm shortcut", () => OpenRuleEditor(rule)));
-            buttons.Children.Add(Button("Remove", async () => { await PauseAsync("Rules changed."); profile = profile with { Rules = profile.Rules.Where(r => r.Id != rule.Id).ToList() }; await SaveAsync(); RenderPage(); }));
+            buttons.Children.Add(Button("Remove", async () =>
+            {
+                RequestPause("Rules changed.");
+                await RunProfileOperationAsync(async () => { profile = profile with { Rules = profile.Rules.Where(r => r.Id != rule.Id).ToList(), Enabled = false }; await SaveAsync(); RenderPage(); });
+            }));
             panel.Children.Add(buttons);
         }
     }
@@ -217,6 +239,8 @@ public partial class MainWindow : Window, IDisposable
     private void OpenRuleEditor(RuleDefinition? existing)
     {
         var dialog = new Window { Owner = this, Title = existing == null ? "Add rule" : "Edit shortcut", Width = 600, Height = 720, MinWidth = 420, MinHeight = 500, WindowStartupLocation = WindowStartupLocation.CenterOwner };
+        var editorOpen = true;
+        dialog.Closed += (_, _) => editorOpen = false;
         var panel = new StackPanel { Margin = new Thickness(24) };
         dialog.Content = new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
         TextBox Field(string label, string value) { panel.Children.Add(Text(label)); var input = new TextBox { Text = value }; AccessibleName(input, label); panel.Children.Add(input); return input; }
@@ -227,31 +251,45 @@ public partial class MainWindow : Window, IDisposable
         panel.Children.Add(Text("KeyBridge checks both combinations for conflicts with protected system, input-method and emergency pause shortcuts. Choose Ctrl + letter actions, optionally with Shift."));
         var ownVersion = FileVersionInfo.GetVersionInfo(Environment.ProcessPath!).FileVersion ?? "";
         var version = Field("Application file version", existing?.Verification.ApplicationVersion.Length > 0 ? existing.Verification.ApplicationVersion : process.Text.Equals("keybridge.exe", StringComparison.OrdinalIgnoreCase) ? ownVersion : "");
-        panel.Children.Add(Button("Select the application executable…", () =>
+        var chooseApplication = Button("Select the application executable…", () =>
         {
             var chooseApp = new OpenFileDialog { Filter = "Windows application (*.exe)|*.exe" };
             if (chooseApp.ShowDialog(dialog) != true) return;
             process.Text = Path.GetFileName(chooseApp.FileName);
             version.Text = FileVersionInfo.GetVersionInfo(chooseApp.FileName).FileVersion ?? "";
-        }));
-        var build = Field("Windows build", existing?.Verification.WindowsBuild ?? Environment.OSVersion.Version.ToString());
+        });
+        panel.Children.Add(chooseApplication);
+        var build = Field("Windows build", RuleEditorChanges.InitialWindowsBuild(existing?.Verification, Environment.OSVersion.Version.ToString()));
         var notes = Field("Shortcut notes (no typed text or input history)", existing?.Verification.Notes ?? "");
         var verified = new CheckBox { Content = new TextBlock { Text = "I confirm this shortcut works as intended with ENG US in the selected application. Confirm again after changing these settings.", TextWrapping = TextWrapping.Wrap }, IsChecked = false, Margin = new Thickness(0, 12, 0, 12) };
         AccessibleName(verified, "Confirm this application's ENG US shortcut"); panel.Children.Add(verified);
+        foreach (var field in new[] { process, source, target, version, build })
+            field.TextChanged += (_, _) => verified.IsChecked = false;
         var global = new CheckBox { Content = new TextBlock { Text = "Save for all applications (kept disabled; choose an application to enable).", TextWrapping = TextWrapping.Wrap }, IsChecked = existing?.Origin == RuleOrigin.UserGlobal }; panel.Children.Add(global);
+        AccessibleName(global, "Save a disabled rule for all applications");
+        void UpdateScopeFields()
+        {
+            var applicationScope = global.IsChecked != true;
+            process.IsEnabled = applicationScope;
+            version.IsEnabled = applicationScope;
+            chooseApplication.IsEnabled = applicationScope;
+            verified.IsEnabled = applicationScope;
+            verified.IsChecked = false;
+        }
+        global.Checked += (_, _) => UpdateScopeFields();
+        global.Unchecked += (_, _) => UpdateScopeFields();
+        UpdateScopeFields();
         var errors = Text(""); panel.Children.Add(errors);
         var ruleId = existing?.Id ?? "user-" + Guid.NewGuid().ToString("N");
         RuleDefinition ReadRule(bool recordEvidence)
         {
-            if (string.IsNullOrWhiteSpace(process.Text) && global.IsChecked != true) throw new InvalidOperationException("Choose an application scope or explicitly opt into a disabled global proposal.");
-            var rule = new RuleDefinition
+            var proposal = new RuleDefinition
             {
                 Id = ruleId, Intent = intent.Text.Trim(), Source = ParseChord(source.Text), Target = ParseChord(target.Text),
                 Scope = new RuleScope { ProcessName = process.Text.Trim().ToLowerInvariant() },
-                Origin = string.IsNullOrWhiteSpace(process.Text) ? RuleOrigin.UserGlobal : RuleOrigin.UserApplication,
-                Enabled = existing?.Enabled == true && recordEvidence,
-                Verification = new VerificationEvidence { ApplicationVersion = version.Text.Trim(), WindowsBuild = build.Text.Trim(), Notes = notes.Text.Trim(), VerifiedContexts = recordEvidence ? [VerifiedContext.EnglishKeyboard] : [] }
+                Verification = new VerificationEvidence { ApplicationVersion = version.Text.Trim(), WindowsBuild = build.Text.Trim(), Notes = notes.Text.Trim() }
             };
+            var rule = RuleEditorChanges.FromProposal(proposal, global.IsChecked == true, existing?.Enabled == true, recordEvidence, existing: existing);
             if (!ShortcutSupport.IsSupportedTarget(rule.Target))
                 throw new InvalidOperationException("Choose a Ctrl + letter target, optionally with Shift.");
             return rule;
@@ -264,10 +302,11 @@ public partial class MainWindow : Window, IDisposable
                     throw new InvalidOperationException("Complete valid configuration, consent, physical role confirmation and emergency recovery on Home first.");
                 var rule = ReadRule(false);
                 if (rule.Origin == RuleOrigin.UserGlobal) throw new InvalidOperationException("Temporary trials require one application scope.");
-                if (!await ReplaceRuleAsync(rule)) { errors.Text = "The proposal was rejected. Check the main window message."; return; }
+                if (!await ReplaceRuleAsync(rule, startApplicationTrial: () => editorOpen)) { errors.Text = "The proposal was rejected. Check the main window message."; return; }
+                if (!editorOpen || quitting) return;
                 if (rule.Scope.ProcessName.Equals("keybridge.exe", StringComparison.OrdinalIgnoreCase))
                 { dialog.Close(); Navigate(4); Feedback.Text = "Begin the isolated editor trial on this page."; return; }
-                if (keyboard?.BeginRuleTrial(profile, rule.Id) == true)
+                if (keyboard?.IsTrial == true)
                 {
                     dialog.Close(); Navigation.SelectedIndex = 4; RenderTrialForApplication(rule);
                     Feedback.Text = "Shortcut preview started. Switch to " + rule.Scope.ProcessName + ", try the shortcut, then pause and confirm your settings.";
@@ -289,13 +328,40 @@ public partial class MainWindow : Window, IDisposable
         dialog.ShowDialog();
     }
 
-    private async Task<bool> ReplaceRuleAsync(RuleDefinition rule)
+    private async Task<bool> ReplaceRuleAsync(RuleDefinition rule, Func<bool>? startApplicationTrial = null)
+    {
+        RequestPause("Rules changed. Review before resuming.");
+        var requestGeneration = pauseGeneration;
+        var safetyGeneration = keyboard?.SafetyPauseGeneration ?? 0;
+        var saved = false;
+        await RunProfileOperationAsync(async () =>
+        {
+            saved = await PersistRuleAsync(rule);
+            if (saved && startApplicationTrial?.Invoke() == true && requestGeneration == pauseGeneration && !quitting
+                && !rule.Scope.ProcessName.Equals("keybridge.exe", StringComparison.OrdinalIgnoreCase))
+                keyboard?.BeginRuleTrial(profile, rule.Id, safetyGeneration);
+        });
+        return saved;
+    }
+
+    private async Task<bool> SetRuleEnabledAsync(string id, bool enabled)
+    {
+        RequestPause("Rules changed. Review before resuming.");
+        var saved = false;
+        await RunProfileOperationAsync(async () =>
+        {
+            var current = profile.Rules.FirstOrDefault(rule => rule.Id == id);
+            if (current != null) saved = await PersistRuleAsync(current with { Enabled = enabled });
+        });
+        return saved;
+    }
+
+    // Called only while profileOperations owns the complete mutation/save workflow.
+    private async Task<bool> PersistRuleAsync(RuleDefinition rule)
     {
         var rules = profile.Rules.Where(r => r.Id != rule.Id).Append(rule).ToList();
         var next = profile with { Rules = rules, Enabled = false };
-        var compiled = RuleCompiler.Compile(next);
-        if (!compiled.Success) { Feedback.Text = string.Join("; ", compiled.Issues.Select(i => i.Message)); return false; }
-        await PauseAsync("Rules changed. Review before resuming.");
+        if (!Accept(next)) return false;
         profile = next;
         return await SaveAsync();
     }
@@ -317,9 +383,14 @@ public partial class MainWindow : Window, IDisposable
         AccessibleName(excluded, "Excluded process names, one per line"); PageContent.Children.Add(excluded);
         ActionButton("Save exclusions", async () =>
         {
-            var next = profile with { ExcludedApps = excluded.Text.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList(), Enabled = false };
-            if (!Accept(next)) return;
-            await PauseAsync("Application exclusions changed."); profile = next; await SaveAsync(); RenderPage();
+            var processes = excluded.Text.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+            RequestPause("Application exclusions changed.");
+            await RunProfileOperationAsync(async () =>
+            {
+                var next = profile with { ExcludedApps = processes, Enabled = false };
+                if (!Accept(next)) return;
+                profile = next; await SaveAsync(); RenderPage();
+            });
         });
     }
 
@@ -340,9 +411,13 @@ public partial class MainWindow : Window, IDisposable
             try
             {
                 var chords = protectedKeys.Text.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(ParseChord).ToList();
-                var next = profile with { ImePolicy = profile.ImePolicy with { AdditionalProtectedShortcuts = chords }, Enabled = false };
-                if (!Accept(next)) return;
-                await PauseAsync("Input-method protection changed. Recheck conflicts and try your shortcuts."); profile = next; await SaveAsync();
+                RequestPause("Input-method protection changed. Recheck conflicts and try your shortcuts.");
+                await RunProfileOperationAsync(async () =>
+                {
+                    var next = profile with { ImePolicy = profile.ImePolicy with { AdditionalProtectedShortcuts = chords }, Enabled = false };
+                    if (!Accept(next)) return;
+                    profile = next; await SaveAsync();
+                });
             }
             catch (ArgumentException ex) { Feedback.Text = ex.Message; }
         });
@@ -359,14 +434,24 @@ public partial class MainWindow : Window, IDisposable
     {
         PageTitle.Text = "Try it safely";
         Paragraph("Preview shortcuts in this local editor; its text stays in memory. Complete setup on Home, select ENG US, then begin a preview. Shortcut conversion stays within this editor.");
-        ActionButton("Begin isolated local trial", () =>
+        ActionButton("Begin isolated local trial", async () =>
         {
             if (smoke) return;
-            if (storageBlocked) { Feedback.Text = "Recover the invalid configuration in Settings before beginning a trial."; return; }
-            if (!profile.ConsentGranted || !profile.RoleKeyConfirmed || !profile.RecoveryTested) { Navigate(0); Feedback.Text = "Complete consent, physical role confirmation and emergency recovery first."; return; }
-            trialDisplayActive = keyboard?.BeginLocalTrial(profile) == true;
-            Feedback.Text = keyboard?.Status ?? "The trial could not start.";
-            trialEditor?.Focus(); UpdateStatus();
+            var requestGeneration = pauseGeneration;
+            var safetyGeneration = keyboard?.SafetyPauseGeneration ?? 0;
+            var requestTrialGeneration = trialGeneration;
+            var editor = trialEditor;
+            await RunProfileOperationAsync(() =>
+            {
+                if (requestGeneration != pauseGeneration || requestTrialGeneration != trialGeneration
+                    || Navigation.SelectedIndex != 4 || editor == null || !ReferenceEquals(editor, trialEditor)) return Task.CompletedTask;
+                if (storageBlocked) { Feedback.Text = "Recover the invalid configuration in Settings before beginning a trial."; return Task.CompletedTask; }
+                if (!profile.ConsentGranted || !profile.RoleKeyConfirmed || !profile.RecoveryTested) { Navigate(0); Feedback.Text = "Complete consent, physical role confirmation and emergency recovery first."; return Task.CompletedTask; }
+                trialDisplayActive = keyboard?.BeginLocalTrial(profile, safetyGeneration) == true;
+                Feedback.Text = keyboard?.Status ?? "The trial could not start.";
+                trialEditor?.Focus(); UpdateStatus();
+                return Task.CompletedTask;
+            });
         });
         ActionButton("End local trial", async () => await PauseAsync("The local trial ended. Mapping is paused."));
         trialReadout = Paragraph("Begin an explicit trial and focus the editor to inspect the key it receives. Readout is cleared when focus leaves.");
@@ -374,7 +459,7 @@ public partial class MainWindow : Window, IDisposable
         trialEditor.LostKeyboardFocus += (_, _) =>
         {
             trialDisplayActive = false;
-            if (keyboard?.IsLocalTrial == true) keyboard.Pause("The editor lost focus. The isolated trial has ended.");
+            if (keyboard?.IsLocalTrial == true) RequestPause("The editor lost focus. The isolated trial has ended.");
             if (trialReadout != null) trialReadout.Text = "Begin an explicit trial and focus the editor to inspect the key it receives.";
             UpdateStatus();
         };
@@ -392,7 +477,12 @@ public partial class MainWindow : Window, IDisposable
         PageTitle.Text = "Temporary application trial";
         Paragraph("Selected application: " + rule.Scope.ProcessName + "\nOperation: " + rule.Intent + "\n" + rule.Source + " → " + rule.Target);
         Paragraph("This preview activates one shortcut in the selected ordinary-permission application with ENG US. Switching away preserves native input. Use your emergency pause shortcut at any time.");
-        ActionButton("Finish & confirm shortcut", () => { keyboard?.Pause("The application trial ended."); Navigate(1); OpenRuleEditor(profile.Rules.First(r => r.Id == rule.Id)); });
+        ActionButton("Finish & confirm shortcut", () =>
+        {
+            RequestPause("The application trial ended."); Navigate(1);
+            var current = profile.Rules.FirstOrDefault(r => r.Id == rule.Id);
+            if (current != null) OpenRuleEditor(current);
+        });
         ActionButton("End preview", async () => { await PauseAsync("The shortcut preview ended."); RenderPage(); });
         UpdateStatus();
     }
@@ -408,9 +498,14 @@ public partial class MainWindow : Window, IDisposable
             try
             {
                 var chord = ParseChord(emergency.Text);
-                var next = profile with { ProfileName = profileName.Text.Trim(), EmergencyPause = chord, RecoveryTested = chord == profile.EmergencyPause && profile.RecoveryTested, Enabled = false };
-                if (!Accept(next)) return;
-                await PauseAsync("Recovery settings changed. Test the registered shortcut before resuming."); profile = next; await SaveAsync(); RenderPage();
+                var name = profileName.Text.Trim();
+                RequestPause("Recovery settings changed. Test the registered shortcut before resuming.");
+                await RunProfileOperationAsync(async () =>
+                {
+                    var next = profile with { ProfileName = name, EmergencyPause = chord, RecoveryTested = chord == profile.EmergencyPause && profile.RecoveryTested, Enabled = false };
+                    if (!Accept(next)) return;
+                    profile = next; await SaveAsync(); RenderPage();
+                });
             }
             catch (ArgumentException ex) { Feedback.Text = ex.Message; }
         });
@@ -421,13 +516,17 @@ public partial class MainWindow : Window, IDisposable
         startup.Click += async (_, _) =>
         {
             if (smoke) return;
-            try
+            var enabled = startup.IsChecked == true;
+            await RunProfileOperationAsync(async () =>
             {
-                var result = await startupController.SetEnabledAsync(startup.IsChecked == true);
-                Feedback.Text = result.Message;
-                profile = profile with { StartAtLogin = result.IsEnabled }; startup.IsChecked = profile.StartAtLogin; await SaveAsync();
-            }
-            catch (Exception) { startup.IsChecked = false; Feedback.Text = "Install KeyBridge through Microsoft Store to use login startup."; }
+                try
+                {
+                    var result = await startupController.SetEnabledAsync(enabled);
+                    Feedback.Text = result.Message;
+                    profile = profile with { StartAtLogin = result.IsEnabled }; startup.IsChecked = profile.StartAtLogin; await SaveAsync();
+                }
+                catch (Exception) { startup.IsChecked = false; Feedback.Text = "Install KeyBridge through Microsoft Store to use login startup."; }
+            });
         };
         Heading("Import & export");
         Paragraph("Versioned JSON stores shortcuts, application scopes and your notes. Exports may contain application information. Imports are size-limited and strictly validated; a rejected file leaves the current profile intact. Importing never enables mapping or grants first-use consent.");
@@ -435,30 +534,37 @@ public partial class MainWindow : Window, IDisposable
         {
             var dialog = new SaveFileDialog { Filter = "KeyBridge JSON (*.json)|*.json", FileName = "KeyBridge-profile.json" };
             if (dialog.ShowDialog(this) != true) return;
-            try { await store.ExportAsync(dialog.FileName, profile); Feedback.Text = "Configuration exported."; } catch (Exception) { Feedback.Text = "Export failed. Check the selected location."; }
+            await RunProfileOperationAsync(async () =>
+            {
+                try { await store.ExportAsync(dialog.FileName, profile); Feedback.Text = "Configuration exported."; } catch (Exception) { Feedback.Text = "Export failed. Check the selected location."; }
+            });
         });
         ActionButton("Import configuration…", async () =>
         {
             var dialog = new OpenFileDialog { Filter = "KeyBridge JSON (*.json)|*.json" };
             if (dialog.ShowDialog(this) != true) return;
-            try
+            RequestPause("Imported configuration. Confirm the physical role and rehearse recovery.");
+            await RunProfileOperationAsync(async () =>
             {
-                var imported = await store.ImportAsync(dialog.FileName);
-                var next = imported with { Enabled = false, ConsentGranted = profile.ConsentGranted, RoleKeyConfirmed = false, RecoveryTested = false, StartAtLogin = profile.StartAtLogin, PreviousSessionClean = false };
-                if (!Accept(next)) return;
-                if (storageBlocked) { await store.PreserveRejectedAsync(); storageBlocked = false; }
-                await PauseAsync("Imported configuration. Confirm the physical role and rehearse recovery."); profile = next; await SaveAsync(); RenderPage();
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException or System.Text.Json.JsonException or ProfileValidationException) { Feedback.Text = "Import rejected: " + ex.Message; }
+                try
+                {
+                    var imported = await store.ImportAsync(dialog.FileName);
+                    var next = imported with { Enabled = false, ConsentGranted = profile.ConsentGranted, RoleKeyConfirmed = false, RecoveryTested = false, StartAtLogin = profile.StartAtLogin, PreviousSessionClean = false };
+                    if (!Accept(next)) return;
+                    await ReplaceStoredProfileAsync(next); RenderPage();
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException or System.Text.Json.JsonException or ProfileValidationException) { Feedback.Text = "Import rejected: " + ex.Message; }
+            });
         });
         ActionButton("Reset to safe defaults…", async () =>
         {
             if (MessageBox.Show("Export your configuration first if you need a backup. Reset all rules and setup confirmations?", "Reset KeyBridge", MessageBoxButton.YesNo) != MessageBoxResult.Yes) return;
-            try { if (storageBlocked) { await store.PreserveRejectedAsync(); storageBlocked = false; } }
-            catch (Exception) { Feedback.Text = "The rejected configuration could not be preserved. Reset was cancelled; the original file remains intact."; return; }
-            await PauseAsync("Reset to safe defaults.");
-            profile = AppProfile.CreateDefault() with { PreviousSessionClean = false, StartAtLogin = profile.StartAtLogin };
-            await SaveAsync(); RenderPage();
+            RequestPause("Reset to safe defaults.");
+            await RunProfileOperationAsync(async () =>
+            {
+                try { await ReplaceStoredProfileAsync(AppProfile.CreateDefault() with { PreviousSessionClean = false, StartAtLogin = profile.StartAtLogin }); RenderPage(); }
+                catch (Exception) { Feedback.Text = "The rejected configuration could not be preserved. Reset was cancelled; the original file remains intact."; }
+            });
         });
         Heading("Language & diagnostics");
         Paragraph("KeyBridge's interface is in English. Diagnostics contain only the app version, current engine state and Windows build. No key sequences, test text, clipboard, window titles or foreground history are exported.");
@@ -480,7 +586,7 @@ public partial class MainWindow : Window, IDisposable
         Paragraph("KeyBridge processes keyboard events and modifier state transiently on your computer to match configured shortcuts. It does not save or upload input content, accumulate ordinary key sequences as text, read clipboard content, read document or password text, read window titles, or inspect IME candidate or composition strings.");
         Paragraph("The application stores your preferences, declarative rules, chosen application process names, shortcut confirmation notes and a clean-shutdown marker under your current-user app data folder. The test editor and shortcut readout exist only while the test page is open. A configuration export includes your selected applications and test notes. Import/export locations are selected by you.");
         Paragraph("Core operation makes no network requests and uses no analytics, ads, account or cloud AI service. Microsoft Store installation, update and any future purchase use Microsoft platform services independently. The application uses public Windows APIs in your user session and never requests elevation or installs a driver or service.");
-        Paragraph("Pausing stops conversion; exiting releases owned input and removes the hook. Uninstall KeyBridge through Windows Settings to remove the application and its managed data. Your manually exported files remain at the locations you selected.");
+        Paragraph("Pausing stops conversion. KeyBridge releases its synthesized input and restores held modifiers; if Windows cannot complete recovery, mapping stays paused and the status identifies the keys to press and release. Exiting removes the hook. Uninstall KeyBridge through Windows Settings to remove the application and its managed data. Your manually exported files remain at the locations you selected.");
         Paragraph("Diagnostics are optional and previewable; they contain version, Windows build and engine state without input content or activity history. Publisher: Zhiqi Zhang. Privacy and support contact: zhiqizhangg@gmail.com. Contacting support is your choice; KeyBridge does not send messages automatically.");
         Paragraph("Full privacy policy: https://github.com/shoutoutuoadi325/keybridge/blob/main/docs/PRIVACY.md. A copy is included with the application as PRIVACY.md.");
         Heading("Supported operation & licenses");
@@ -495,11 +601,16 @@ public partial class MainWindow : Window, IDisposable
         if (capturingRole)
         {
             capturingRole = false;
-            var confirmed = code == profile.CommandKey;
-            profile = profile with { RoleKeyConfirmed = confirmed };
-            if (roleReadout != null) roleReadout.Text = "Windows reports: " + code + (confirmed ? " · Selected role confirmed." : " · Does not match the selected role. Choose again.");
-            await SaveAsync();
             e.Handled = true;
+            var selectedRole = profile.CommandKey;
+            RequestPause("Physical role confirmation. Mapping is paused.");
+            await RunProfileOperationAsync(async () =>
+            {
+                var confirmed = selectedRole == profile.CommandKey && code == profile.CommandKey;
+                profile = profile with { RoleKeyConfirmed = confirmed, Enabled = false };
+                if (roleReadout != null) roleReadout.Text = "Windows reports: " + code + (confirmed ? " · Selected role confirmed." : " · Does not match the selected role. Choose again.");
+                await SaveAsync();
+            });
         }
         else if (trialDisplayActive && trialEditor?.IsKeyboardFocusWithin == true && trialReadout != null)
         {
@@ -513,44 +624,70 @@ public partial class MainWindow : Window, IDisposable
         if (result.Success) return true;
         Feedback.Text = "Configuration rejected: " + string.Join("; ", result.Issues.Select(i => i.Message)); return false;
     }
-    private async Task<bool> SaveAsync()
+    private async Task<bool> SaveAsync(bool configureEngine = true)
     {
         if (smoke) return true;
-        if (storageBlocked) { keyboard?.Pause("The saved configuration is invalid. Explicitly import or reset in Settings to recover."); Feedback.Text = "The original invalid configuration is preserved. Import a valid file or explicitly reset in Settings before saving or enabling."; return false; }
+        if (!initialized || disposed) return false;
+        if (storageBlocked) { profile = profile with { Enabled = false }; keyboard?.Pause("The saved configuration is invalid. Explicitly import or reset in Settings to recover."); Feedback.Text = "The original invalid configuration is preserved. Import a valid file or explicitly reset in Settings before saving or enabling."; return false; }
         var candidate = profile;
-        try { await store.SaveAsync(candidate); lastSavedProfile = candidate; keyboard?.Configure(candidate); UpdateStatus(); return true; }
-        catch (Exception) { profile = lastSavedProfile with { Enabled = false }; keyboard?.Pause("Settings could not be saved. Mapping stopped."); Feedback.Text = "Settings could not be saved. Previous settings are preserved and mapping is paused."; return false; }
+        try { await store.SaveAsync(candidate); lastSavedProfile = candidate; if (configureEngine) keyboard?.Configure(candidate); UpdateStatus(); return true; }
+        catch (Exception) { profile = lastSavedProfile with { Enabled = false }; if (configureEngine) keyboard?.Pause("Settings could not be saved. Mapping stopped."); Feedback.Text = "Settings could not be saved. Previous settings are preserved and mapping is paused."; return false; }
     }
     private async Task EnableAsync()
     {
         if (smoke) return;
-        if (!profile.ConsentGranted || !profile.RoleKeyConfirmed || !profile.RecoveryTested)
-        { OpenWindow(); Navigate(0); Feedback.Text = "Complete consent, physical role confirmation and the emergency pause test first."; return; }
-        if (!profile.Rules.Any(r => r.Enabled)) { OpenWindow(); Navigate(1); Feedback.Text = "Choose and confirm a shortcut before enabling it."; return; }
-        profile = profile with { Enabled = true };
-        if (!await SaveAsync()) return;
-        if (!profile.Enabled) return;
-        if (keyboard?.Resume() != true) { profile = profile with { Enabled = false }; await SaveAsync(); Feedback.Text = keyboard?.Status ?? "Mapping could not start."; }
-        UpdateStatus();
+        var requestGeneration = pauseGeneration;
+        var safetyGeneration = keyboard?.SafetyPauseGeneration ?? 0;
+        await RunProfileOperationAsync(async () =>
+        {
+            if (requestGeneration != pauseGeneration || safetyGeneration != keyboard?.SafetyPauseGeneration) return;
+            if (!profile.ConsentGranted || !profile.RoleKeyConfirmed || !profile.RecoveryTested)
+            { OpenWindow(); Navigate(0); Feedback.Text = "Complete consent, physical role confirmation and the emergency pause test first."; return; }
+            if (!profile.Rules.Any(r => r.Enabled)) { OpenWindow(); Navigate(1); Feedback.Text = "Choose and confirm a shortcut before enabling it."; return; }
+            profile = profile with { Enabled = true };
+            if (!await SaveAsync()) return;
+            if (requestGeneration != pauseGeneration || safetyGeneration != keyboard?.SafetyPauseGeneration || quitting) { profile = profile with { Enabled = false }; await SaveAsync(); return; }
+            if (keyboard?.Resume(safetyGeneration) != true) { profile = profile with { Enabled = false }; await SaveAsync(); Feedback.Text = keyboard?.Status ?? "Mapping could not start."; }
+            UpdateStatus();
+        });
     }
     private async Task PauseAsync(string reason)
     {
-        trialDisplayActive = false;
-        keyboard?.Pause(reason);
-        profile = profile with { Enabled = false };
-        await SaveAsync(); keyboard?.Pause(reason); UpdateStatus();
+        RequestPause(reason);
+        await RunProfileOperationAsync(async () =>
+        {
+            profile = profile with { Enabled = false };
+            await SaveAsync(); keyboard?.Pause(reason); UpdateStatus();
+        });
     }
-    public void EmergencyStop(string reason) { keyboard?.Pause(reason); profile = profile with { Enabled = false }; }
+    private void RequestPause(string reason) { pauseGeneration++; trialDisplayActive = false; keyboard?.Pause(reason); }
+    private Task<bool> RunProfileOperationAsync(Func<Task> operation) => profileOperations.RunAsync(operation);
+    private async Task ReplaceStoredProfileAsync(AppProfile next)
+    {
+        var wasBlocked = storageBlocked;
+        if (wasBlocked) await store.PreserveRejectedAsync();
+        storageBlocked = false;
+        profile = next;
+        if (!await SaveAsync()) storageBlocked = wasBlocked;
+    }
+    public void EmergencyStop(string reason) { RequestPause(reason); profile = profile with { Enabled = false }; }
     private async void PauseClick(object sender, RoutedEventArgs e) => await PauseAsync("Paused by you.");
     private async void ExitClick(object sender, RoutedEventArgs e) => await QuitAsync();
     private async Task QuitAsync()
     {
         if (quitting) return;
         quitting = true;
-        keyboard?.Pause("Exiting KeyBridge.");
-        profile = profile with { Enabled = false, PreviousSessionClean = true };
-        await SaveAsync();
-        Dispose(); Application.Current.Shutdown();
+        RequestPause("Exiting KeyBridge.");
+        await profileOperations.CloseAsync(async () =>
+        {
+            var recovered = keyboard?.PrepareForExit() ?? true;
+            if (initialized && !storageBlocked)
+            {
+                profile = profile with { Enabled = false, PreviousSessionClean = recovered };
+                await SaveAsync(configureEngine: false);
+            }
+            Dispose(); Application.Current.Shutdown();
+        });
     }
     private void OnClosing(object? sender, CancelEventArgs e)
     {
@@ -645,15 +782,8 @@ public partial class MainWindow : Window, IDisposable
     private static void AccessibleName(DependencyObject control, string name) => AutomationProperties.SetName(control, name);
     private static KeyChord ParseChord(string value)
     {
-        var tokens = value.Split('+', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
-        if (tokens.Length == 0) throw new ArgumentException("Enter a keyboard combination.");
-        var modifiers = KeyModifiers.None;
-        for (var i = 0; i < tokens.Length - 1; i++)
-        {
-            if (!Enum.TryParse<KeyModifiers>(tokens[i], true, out var modifier) || !Enum.IsDefined(modifier) || modifier == KeyModifiers.None) throw new ArgumentException("Unknown modifier: " + tokens[i]);
-            modifiers |= modifier;
-        }
-        if (!Enum.TryParse<KeyCode>(tokens[^1], true, out var key) || !Enum.IsDefined(key)) throw new ArgumentException("Unknown key: " + tokens[^1]);
-        return new KeyChord(modifiers, key);
+        if (!KeyChordParser.TryParse(value, out var chord))
+            throw new ArgumentException("Enter a valid keyboard combination, for example Ctrl + C or Command + Shift + Z. Use each modifier once.");
+        return chord;
     }
 }

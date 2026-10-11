@@ -78,7 +78,7 @@ The current product identity and submission are recorded in `STORE_SUBMISSION.md
 3. Choose only application/input contexts listed in the accompanying verified support record. Inspect source/target conflicts and reserved keys.
 4. Test the local editor and the listed real external applications; explicitly enable conversion. The local editor is not evidence of other-app compatibility.
 5. Confirm native Ctrl actions, unmatched keys and unknown IME contexts pass through; higher-integrity windows remain unsupported.
-6. Pause from the window and tray and use Ctrl+Alt+F12. Verify Resume requires the user and Exit stops conversion.
+6. Pause from the window and tray and use the configured emergency shortcut (Ctrl+Alt+F10 by default). Verify Resume requires the user and Exit stops conversion.
 7. If desired, enable login startup, disable it in Windows, and verify the app respects the Windows-disabled state and a saved pause.
 8. Export/import declarative settings. Confirm invalid/oversized/future schemas preserve the active settings.
 9. Exit, uninstall through Windows Settings and confirm normal keyboard behavior with no permanent mapping.

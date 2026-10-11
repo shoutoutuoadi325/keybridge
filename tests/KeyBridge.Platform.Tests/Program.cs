@@ -152,4 +152,49 @@ Check(injected.Plan(new(KeyModifiers.Control, KeyCode.Y)) is not null,
 injected.Seed(KeyCode.LeftAlt, true);
 injected.ObserveExternalNative(KeyCode.LeftAlt, false);
 Check(injected.PlanRecovery().Count == 0, "Recovery never restores a modifier released by another tool; it restores only app-suspended native modifiers.");
+
+// Exercise source suppression with the actual planner, including the case where
+// the synthetic target up clears native state for the still-held source key.
+foreach (var targetKey in new[] { KeyCode.C, KeyCode.Y })
+{
+    var physical = new ModifierLifecycle();
+    var sourcePress = new SourcePressLifecycle();
+    physical.Seed(KeyCode.LeftAlt, true);
+    physical.ObservePhysical(KeyCode.C, true, false);
+    sourcePress.Suppress(KeyCode.C);
+    physical.AcceptInserted(physical.Plan(new(KeyModifiers.Control, targetKey))!);
+    Check(physical.IsPhysicalDown(KeyCode.C) && !physical.IsNativeDown(KeyCode.C)
+        && sourcePress.HasPendingRelease,
+        $"Target {targetKey}: native source up after conversion cannot finish physical drain.");
+    Check(sourcePress.Observe(KeyCode.C, isUp: false, isInjected: false)
+        && sourcePress.HasPendingRelease,
+        $"Target {targetKey}: a held physical source repeat stays suppressed during pause.");
+    physical.ObserveExternalNative(KeyCode.C, false);
+    Check(!sourcePress.Observe(KeyCode.C, isUp: true, isInjected: true)
+        && sourcePress.IsSuppressed(KeyCode.C) && physical.IsPhysicalDown(KeyCode.C),
+        $"Target {targetKey}: external injected up passes through without releasing physical suppression.");
+    Check(!sourcePress.Observe(targetKey, isUp: true, isInjected: true)
+        && sourcePress.HasPendingRelease,
+        $"Target {targetKey}: own synthetic target up cannot finish physical drain.");
+    Check(sourcePress.Observe(KeyCode.C, isUp: false, isInjected: false),
+        $"Target {targetKey}: source repeat remains suppressed after injected releases.");
+    Check(sourcePress.Observe(KeyCode.C, isUp: true, isInjected: false)
+        && !sourcePress.HasPendingRelease,
+        $"Target {targetKey}: a real physical up is consumed and completes the drain.");
+    Check(!sourcePress.Observe(KeyCode.C, isUp: false, isInjected: false),
+        $"Target {targetKey}: the next physical press can pass natively after pause.");
+}
+var multipleSources = new SourcePressLifecycle();
+multipleSources.Suppress(KeyCode.C);
+multipleSources.Suppress(KeyCode.Z);
+Check(multipleSources.Observe(KeyCode.C, isUp: true, isInjected: false)
+    && multipleSources.HasPendingRelease && multipleSources.IsSuppressed(KeyCode.Z),
+    "Releasing one mapped source keeps the drain active for the other source.");
+Check(!multipleSources.Observe(KeyCode.Y, isUp: true, isInjected: false)
+    && multipleSources.HasPendingRelease,
+    "An unrelated physical release cannot unblock a pending mapped source.");
+Check(multipleSources.Observe(KeyCode.Z, isUp: false, isInjected: false)
+    && multipleSources.Observe(KeyCode.Z, isUp: true, isInjected: false)
+    && !multipleSources.HasPendingRelease,
+    "Pressing and releasing a source after a missed release completes paused recovery.");
 Console.WriteLine($"Passed {passed} keyboard lifecycle and native structure checks. Real Windows compatibility is not claimed.");

@@ -60,7 +60,7 @@ public sealed record AppProfile
     [JsonRequired] public KeyCode CommandKey { get; init; } = KeyCode.LeftAlt;
     [JsonRequired] public bool Enabled { get; init; }
     [JsonRequired] public bool StartAtLogin { get; init; }
-    [JsonRequired] public KeyChord EmergencyPause { get; init; } = new(KeyModifiers.Control | KeyModifiers.Alt, KeyCode.F12);
+    [JsonRequired] public KeyChord EmergencyPause { get; init; } = EmergencyShortcuts.Default;
     public bool ConsentGranted { get; init; }
     public bool RoleKeyConfirmed { get; init; }
     public bool RecoveryTested { get; init; }

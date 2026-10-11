@@ -146,11 +146,11 @@ Test("System reserved source and target shortcuts are rejected", () =>
 });
 Test("Recovery source and target shortcuts are rejected", () =>
 {
-    Reject(Profile(Rule(source: new(KeyModifiers.LeftControl | KeyModifiers.LeftAlt, KeyCode.F12))), "RecoveryConflict");
-    Reject(Profile(Rule(target: new(KeyModifiers.Control | KeyModifiers.LeftAlt, KeyCode.F12))), "RecoveryConflict");
+    Reject(Profile(Rule(source: new(KeyModifiers.LeftControl | KeyModifiers.LeftAlt, KeyCode.F10))), "RecoveryConflict");
+    Reject(Profile(Rule(target: new(KeyModifiers.Control | KeyModifiers.LeftAlt, KeyCode.F10))), "RecoveryConflict");
 });
 Test("Emergency registration cannot claim side-specific modifier behavior", () =>
-    Reject(Profile(Rule()) with { EmergencyPause = new(KeyModifiers.LeftControl | KeyModifiers.LeftAlt, KeyCode.F12) }, "EmergencyPause"));
+    Reject(Profile(Rule()) with { EmergencyPause = new(KeyModifiers.LeftControl | KeyModifiers.LeftAlt, KeyCode.F10) }, "EmergencyPause"));
 Test("Known and user IME shortcut conflicts check both sides", () =>
 {
     Reject(Profile(Rule(target: new(KeyModifiers.LeftControl, KeyCode.Space))), "ImeConflict");
@@ -317,6 +317,10 @@ Test("Rejected configuration preservation is explicit, faithful and bounded", ()
     }
     finally { if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true); }
 });
+
+RuleEditorChecks.Register(Test);
+EmergencyShortcutChecks.Register(Test);
+ProfileOperationChecks.Register(Test);
 
 var failures = 0;
 foreach (var (name, run) in tests)

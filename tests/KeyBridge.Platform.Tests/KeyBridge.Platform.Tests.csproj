@@ -9,6 +9,7 @@
   <ItemGroup>
     <ProjectReference Include="../../src/KeyBridge.Core/KeyBridge.Core.csproj" />
     <Compile Include="../../src/KeyBridge.App/Platform/ModifierLifecycle.cs" Link="ModifierLifecycle.cs" />
+    <Compile Include="../../src/KeyBridge.App/Platform/SourcePressLifecycle.cs" Link="SourcePressLifecycle.cs" />
     <Compile Include="../../src/KeyBridge.App/Platform/LocalTrialRules.cs" Link="LocalTrialRules.cs" />
     <Compile Include="../../src/KeyBridge.App/Platform/ApplicationRuleTrial.cs" Link="ApplicationRuleTrial.cs" />
     <Compile Include="../../src/KeyBridge.App/Platform/NativeMethods.cs" Link="NativeMethods.cs" />

@@ -90,8 +90,8 @@ public static class RuleCompiler
             Error("CommandKey", "Select a supported side-specific role key. Right Alt is protected because it may represent AltGr.");
         if (!ValidChord(profile.EmergencyPause, false) || profile.EmergencyPause.Modifiers == KeyModifiers.None
             || (profile.EmergencyPause.Modifiers & ~(KeyModifiers.Shift | KeyModifiers.Control | KeyModifiers.Alt | KeyModifiers.Windows)) != 0
-            || IsReserved(profile.EmergencyPause))
-            Error("EmergencyPause", "The emergency shortcut must be a supported modified key and must not be reserved by Windows.");
+            || profile.EmergencyPause.Key == KeyCode.F12 || IsReserved(profile.EmergencyPause))
+            Error("EmergencyPause", "Choose a supported modified recovery key. Windows security shortcuts and the debugger-reserved F12 key are unavailable.");
         if (profile.Enabled && (!profile.ConsentGranted || !profile.RoleKeyConfirmed || !profile.RecoveryTested))
             Error("SetupIncomplete", "Consent, role-key confirmation, and recovery testing are required before enabling mapping.");
         if (profile.ImePolicy is null || profile.Rules is null || profile.ExcludedApps is null)
@@ -107,6 +107,11 @@ public static class RuleCompiler
             Error("ImeProtection", "The IME protection list must contain at most 32 shortcuts.");
         else foreach (var chord in profile.ImePolicy.AdditionalProtectedShortcuts)
             if (!ValidChord(chord, false)) Error("ImeProtection", "An additional protected shortcut is invalid.");
+        var protectedShortcuts = ProtectedImeShortcuts.Concat(profile.ImePolicy.AdditionalProtectedShortcuts ?? [])
+            .Where(chord => ValidChord(chord, false)).ToArray();
+        if (ValidChord(profile.EmergencyPause, false)
+            && protectedShortcuts.Any(chord => profile.EmergencyPause.Overlaps(chord)))
+            Error("EmergencyImeConflict", "The emergency pause shortcut conflicts with a protected input-method shortcut. Choose another recovery shortcut.");
         foreach (var app in profile.ExcludedApps)
             if (!ValidProcessName(app, false)) Error("ExcludedApplication", "Excluded applications must be executable file names without paths.");
         var ids = new HashSet<string>(StringComparer.Ordinal);
@@ -136,10 +141,9 @@ public static class RuleCompiler
             if (IsReserved(source) || IsReserved(rule.Target)) Error("ReservedShortcut", "Windows reserved shortcuts cannot be used as a source or target.", rule.Id);
             if (profile.EmergencyPause is not null && (source.Overlaps(profile.EmergencyPause) || rule.Target.Overlaps(profile.EmergencyPause)))
                 Error("RecoveryConflict", "A rule cannot consume or emit the emergency pause shortcut.", rule.Id);
-            var protectedShortcuts = ProtectedImeShortcuts.Concat(profile.ImePolicy.AdditionalProtectedShortcuts ?? []);
-            if (protectedShortcuts.Any(c => c is not null && (source.Overlaps(c) || rule.Target.Overlaps(c))))
+            if (protectedShortcuts.Any(c => source.Overlaps(c) || rule.Target.Overlaps(c)))
                 Error("ImeConflict", "A source or target conflicts with a protected input-method shortcut.", rule.Id);
-            if (SensitiveKeys.Contains(source.Key) || SensitiveKeys.Contains(rule.Target.Key))
+            if (ShortcutSupport.RequiresNoComposition(source.Key) || ShortcutSupport.RequiresNoComposition(rule.Target.Key))
                 if (rule.ContextPolicy != ContextPolicy.RequiresNoComposition) Error("CompositionProtection", "Navigation and deletion rules must require confirmed idle composition.", rule.Id);
             var evidence = rule.Verification;
             if (evidence is null || !ValidText(evidence.ApplicationVersion, 128) || !ValidText(evidence.WindowsBuild, 128)
@@ -163,9 +167,6 @@ public static class RuleCompiler
         }
         return new(issues.Count == 0 ? new CompiledProfile(profile) : null, issues.AsReadOnly());
     }
-
-    private static readonly HashSet<KeyCode> SensitiveKeys = [KeyCode.Backspace, KeyCode.Delete, KeyCode.Left, KeyCode.Right,
-        KeyCode.Up, KeyCode.Down, KeyCode.Home, KeyCode.End, KeyCode.PageUp, KeyCode.PageDown, KeyCode.Enter, KeyCode.Escape, KeyCode.Space];
 
     public static bool IsReserved(KeyChord chord)
     {

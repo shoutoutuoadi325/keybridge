@@ -41,12 +41,17 @@ public sealed class ProfileStore
         try
         {
             if (!File.Exists(ProfilePath)) return new(AppProfile.CreateDefault(), false, false, "Welcome. Mapping remains paused until setup is complete.");
-            var profile = await ReadValidatedAsync(ProfilePath, cancellationToken);
+            var loaded = await ReadValidatedAsync(ProfilePath, cancellationToken);
+            var profile = loaded.Profile;
+            var recoveryMessage = loaded.EmergencyChanged
+                ? $"The previous default recovery shortcut used F12, which Windows reserves for debugging. Your rules are preserved. Press {profile.EmergencyPause} to confirm the replacement before resuming. "
+                : "";
             if (!profile.PreviousSessionClean)
                 return new(profile with { Enabled = false, RecoveryTested = false }, true, true,
-                    "The previous session did not exit cleanly. Release and press any affected modifier, then test recovery before resuming.");
+                    recoveryMessage + "The previous session did not exit cleanly. Release and press any affected modifier, then test recovery before resuming.");
             // Every launch requires a deliberate resume; a stored pause is never automatically discarded.
-            return new(profile with { Enabled = false }, true, false, "Settings loaded. Mapping is paused until you resume.");
+            return new(profile with { Enabled = false }, true, loaded.EmergencyChanged,
+                recoveryMessage + "Settings loaded. Mapping is paused until you resume.");
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or ProfileValidationException)
         {
@@ -121,7 +126,7 @@ public sealed class ProfileStore
 
     public async Task<AppProfile> ImportAsync(string path, CancellationToken cancellationToken = default)
     {
-        var imported = await ReadValidatedAsync(path, cancellationToken);
+        var imported = (await ReadValidatedAsync(path, cancellationToken)).Profile;
         return imported with
         {
             Enabled = false, StartAtLogin = false, ConsentGranted = false, RoleKeyConfirmed = false,
@@ -151,24 +156,38 @@ public sealed class ProfileStore
         return result;
     }
 
-    public static AppProfile Deserialize(ReadOnlySpan<byte> bytes)
+    public static AppProfile Deserialize(ReadOnlySpan<byte> bytes) => DeserializeWithRecovery(bytes).Profile;
+
+    private static (AppProfile Profile, bool EmergencyChanged) DeserializeWithRecovery(ReadOnlySpan<byte> bytes)
     {
         if (bytes.Length is 0 or > MaximumFileBytes) throw new ProfileValidationException("The configuration file size is invalid.");
         RejectDuplicateProperties(bytes);
         var result = JsonSerializer.Deserialize<AppProfile>(bytes, JsonOptions)
             ?? throw new ProfileValidationException("The configuration must be a JSON object.");
-        Validate(result);
-        return result;
+        // Migrate only the exact previous default in an otherwise valid profile. Do
+        // not use migration to soften unrelated validation errors or grant setup.
+        var compilation = RuleCompiler.Compile(result);
+        if (result.EmergencyPause == EmergencyShortcuts.LegacyDefault
+            && compilation.Issues.Count == 1 && compilation.Issues[0].Code == "EmergencyPause")
+        {
+            foreach (var chord in EmergencyShortcuts.MigrationCandidates)
+            {
+                var migrated = result with { EmergencyPause = chord, Enabled = false, RecoveryTested = false };
+                if (RuleCompiler.Compile(migrated).Success) return (migrated, true);
+            }
+        }
+        ThrowIfInvalid(compilation);
+        return (result, false);
     }
 
-    private static async Task<AppProfile> ReadValidatedAsync(string path, CancellationToken cancellationToken)
+    private static async Task<(AppProfile Profile, bool EmergencyChanged)> ReadValidatedAsync(string path, CancellationToken cancellationToken)
     {
         await using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, FileOptions.Asynchronous);
         if (stream.Length is 0 or > MaximumFileBytes) throw new ProfileValidationException("The configuration file size is invalid.");
         var bytes = new byte[(int)stream.Length];
         await stream.ReadExactlyAsync(bytes, cancellationToken);
         if (stream.ReadByte() != -1) throw new ProfileValidationException("The configuration changed while it was being read.");
-        return Deserialize(bytes);
+        return DeserializeWithRecovery(bytes);
     }
 
     private static async Task AtomicWriteAsync(string path, AppProfile profile, bool keepBackup, CancellationToken cancellationToken)
@@ -192,9 +211,10 @@ public sealed class ProfileStore
         finally { if (File.Exists(temporary)) File.Delete(temporary); }
     }
 
-    private static void Validate(AppProfile profile)
+    private static void Validate(AppProfile profile) => ThrowIfInvalid(RuleCompiler.Compile(profile));
+
+    private static void ThrowIfInvalid(CompilationResult compilation)
     {
-        var compilation = RuleCompiler.Compile(profile);
         if (!compilation.Success) throw new ProfileValidationException("The configuration is invalid: "
             + string.Join(" ", compilation.Issues.Select(issue => issue.Message)), compilation.Issues);
     }
