@@ -59,4 +59,6 @@ Ordinary-user WPF app; asInvoker, uiAccess=false, no elevation, driver or servic
 
 ## Submission record
 
-The owner authorized Developer Agreement 8.11 and the IARC terms on October 11, 2026. Pricing, properties and age ratings are saved. The original 0.1.3 submission was returned to draft to replace its package, screenshots and release copy with version 0.1.4. Publication uses the existing manual control.
+Version 0.1.4.0 was resubmitted on October 11, 2026 after replacing the package, all four screenshots, English listing, reviewer instructions and capability rationale. Before submission, Partner Center marked the package Validated and all six sections Complete. The submission receipt reports In certification, Submission Complete and Pre-processing In progress. Publication retains the existing manual Publish now control.
+
+Developer Agreement 8.11 and IARC terms were accepted with explicit owner authorization. Pricing remains Free. Corresponding application source: commit `8d5bb7c`; subsequent commits update copy conventions, packaging output and this record. Local receipts are under `artifacts/store-submission`, including `release-submitted-0.1.4.jpg`, `release-listing-0.1.4.jpg` and `release-reviewer-notes-0.1.4.jpg`.
