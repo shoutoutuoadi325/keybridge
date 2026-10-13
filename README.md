@@ -8,15 +8,21 @@
 
 Bring familiar Command-style shortcuts to your Windows desktop, with application-specific settings and private, local processing.
 
-[Download for Windows](https://github.com/shoutoutuoadi325/keybridge/releases/latest) · [Getting started](#getting-started) · [Privacy](docs/PRIVACY.md) · [Support](#support)
+[Microsoft Store](https://apps.microsoft.com/detail/9nk4xxk1jh04?ocid=webpdpshare) · [Portable ZIP](https://github.com/shoutoutuoadi325/keybridge/releases/latest) · [Getting started](#getting-started) · [Privacy](docs/PRIVACY.md) · [Support](#support)
 
 </div>
 
 ## Download
 
+**Microsoft Store (Windows app)**
+**[Get KeyBridge on Microsoft Store](https://apps.microsoft.com/detail/9nk4xxk1jh04?ocid=webpdpshare)**
+
+The Store edition installs through Microsoft Store and supports optional Windows-managed login startup.
+
+**GitHub portable ZIP (v0.1.5)**
 **[Download KeyBridge 0.1.5 for Windows x64](https://github.com/shoutoutuoadi325/keybridge/releases/download/v0.1.5/KeyBridge-0.1.5-win-x64.zip)**
 
-Extract the entire ZIP to a folder of your choice, then open **KeyBridge.exe**. The download includes the .NET runtime, so no separate runtime installation is required. Keep the extracted files together.
+Extract the entire ZIP to a folder of your choice, then open **KeyBridge.exe**. The portable edition runs directly from its extracted folder. The download includes the .NET runtime, so no separate runtime installation is required. Keep the extracted files together.
 
 Requires **Windows 11, an x64 processor and a physical keyboard**. The interface is in English. [Release notes and checksums](https://github.com/shoutoutuoadi325/keybridge/releases/latest) are available with each download.
 

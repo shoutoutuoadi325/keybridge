@@ -17,6 +17,12 @@
 - Package SHA-256: `E6791091C317AB9F1C9529856A453245BB3A9619BB7D42B2F32D9C92E915A4BB`
 - Privacy: https://github.com/shoutoutuoadi325/keybridge/blob/main/docs/PRIVACY.md
 
+## Publication status
+
+KeyBridge is now published on the Microsoft Store: https://apps.microsoft.com/detail/9nk4xxk1jh04?ocid=webpdpshare.
+
+The submission record below preserves the October 11, 2026 in-certification receipts and package evidence for version 0.1.5.0.
+
 ## Store description
 
 Bring familiar Command-style shortcuts to your Windows desktop with KeyBridge. Choose a physical Command key and personalize shortcuts for each application, with presets for Microsoft Edge, Google Chrome, Visual Studio Code and the built-in editor.
@@ -76,7 +82,7 @@ The replacement MSIX passed local MakeAppx validation, all 188 deterministic che
 
 The English listing now includes the update notes above and four new 2740 x 1761 screenshots of Home, Shortcuts, Try it and Settings rendered from the final package. Reviewer instructions and the 499-character restricted-capability explanation were saved. The current publishing option was observed as Publish this submission as soon as it passes certification; that setting was retained. No agreement or age-rating terms were accepted in this update.
 
-The final resubmission receipt at 21:35 China Standard Time on October 11, 2026 reports In certification: Submission Complete, Pre-processing In progress, Certification Not started and Publishing Not started. Partner Center confirms that publishing starts as soon as certification passes. An initial submission was canceled to clarify that closing a page or setup dialog cancels pending preview starts; the corrected listing and reviewer text were saved, reopened to verify persistence and resubmitted. Certification approval and publication have not yet been observed.
+The final resubmission receipt at 21:35 China Standard Time on October 11, 2026 reports In certification: Submission Complete, Pre-processing In progress, Certification Not started and Publishing Not started. Partner Center confirms that publishing starts as soon as certification passes. An initial submission was canceled to clarify that closing a page or setup dialog cancels pending preview starts; the corrected listing and reviewer text were saved, reopened to verify persistence and resubmitted. This line records that submission-time state; KeyBridge is now published at https://apps.microsoft.com/detail/9nk4xxk1jh04?ocid=webpdpshare.
 
 Local receipts are under `artifacts/store-submission`: `product-identity-0.1.5.png`, `reviewer-notes-0.1.5.png`, `listing-0.1.5.png`, `package-validated-0.1.5.png` and the final `submitted-0.1.5.png`. Final package verification is under `artifacts/store-0.1.5-verification/final`. No new physical keyboard session or installed-package/WACK run was performed.
 
