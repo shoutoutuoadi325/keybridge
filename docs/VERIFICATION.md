@@ -20,7 +20,7 @@ For each run: date/time, tester, commit, package SHA-256, Windows edition/build/
 | Store package acceptance | Validated | Final 0.1.5.0 MSIX accepted with Zhiqi Zhang; runFullTrust approval remains part of certification |
 | UI rendering | Passed | Seven pages from the final extracted 0.1.5.0 MSIX; exit code zero; no hook, hotkey or profile writes |
 | English Store listing screenshots | Saved | Four 2740 x 1761 renders of Home, Shortcuts, Try it and Settings from the final package |
-| Store submission | In certification | October 11, 2026 final receipt: Submission Complete, Pre-processing In progress; automatic publication after certification; approval not yet observed |
+| Store submission | Published | October 11, 2026 final receipt captured the in-certification state (Submission Complete, Pre-processing In progress). KeyBridge is now published on Microsoft Store: https://apps.microsoft.com/detail/9nk4xxk1jh04?ocid=webpdpshare |
 | Physical keyboard, packaged startup/update/uninstall and WACK | Not run for 0.1.5.0 | No additional interactive keyboard session or installed-package certification-kit run |
 
 ## Required real Windows cases
